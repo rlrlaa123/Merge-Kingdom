@@ -13,12 +13,17 @@
   -webkit-user-select: none;
   -webkit-touch-callout: none;
   gap: 2px;
-  transition: transform 0.1s;
+  /* 각 아이템을 독립 GPU 합성 레이어로 분리 → 리렌더 시 깜빡임 방지 */
+  will-change: transform;
 }
 
 .item:active {
   cursor: grabbing;
-  transform: scale(0.9);
+}
+
+/* opacity가 아닌 visibility로 숨김 → 모바일 GPU 리페인트 아티팩트 방지 */
+.dragging {
+  visibility: hidden;
 }
 
 .fresh {

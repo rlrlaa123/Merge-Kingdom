@@ -1,10 +1,10 @@
 .grid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: 8px;
-  padding: 16px;
+  gap: clamp(6px, 2vw, 10px);
+  padding: clamp(12px, 3vw, 20px);
   width: 100%;
-  max-width: 360px;
+  max-width: min(95vw, 420px);
   margin: 0 auto;
 }
 

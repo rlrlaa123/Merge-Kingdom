@@ -24,3 +24,27 @@
   box-shadow: 0 0 16px rgba(255,215,0,0.5);
   background: rgba(255,215,0,0.08);
 }
+
+.cell.merged {
+  animation: mergeFlash 0.5s ease-out;
+}
+
+@keyframes mergeFlash {
+  0%   { box-shadow: 0 0 0px rgba(255,215,0,0); }
+  40%  { box-shadow: 0 0 24px rgba(255,215,0,0.8); background: rgba(255,215,0,0.15); }
+  100% { box-shadow: 0 0 0px rgba(255,215,0,0); }
+}
+
+.floatingText {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #ffd700;
+  text-shadow: 0 1px 6px rgba(0,0,0,0.9);
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 50;
+}

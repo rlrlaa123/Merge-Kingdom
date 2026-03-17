@@ -2,7 +2,6 @@ import { useState } from 'react';
 import TopBar from './components/TopBar';
 import Grid from './components/Grid';
 import BottomBar from './components/BottomBar';
-import FloatingText from './components/FloatingText';
 import CollectionModal from './components/CollectionModal';
 import OfflineRewardModal from './components/OfflineRewardModal';
 import { useAutoIncome } from './hooks/useAutoIncome';
@@ -24,7 +23,6 @@ function App() {
         <Grid />
       </main>
       <BottomBar />
-      <FloatingText />
       <CollectionModal open={collectionOpen} onClose={() => setCollectionOpen(false)} />
       <OfflineRewardModal reward={reward} onClose={clearReward} />
     </div>

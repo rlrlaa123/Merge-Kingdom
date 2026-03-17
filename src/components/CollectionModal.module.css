@@ -1,0 +1,76 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.modal {
+  background: linear-gradient(135deg, #1a1a2e, #16213e);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 20px;
+  padding: 24px;
+  width: 100%;
+  max-width: 320px;
+}
+
+.title {
+  text-align: center;
+  margin: 0 0 16px;
+  font-size: 1.3rem;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 10px 4px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+.card.locked {
+  opacity: 0.5;
+}
+
+.emoji {
+  font-size: 1.5rem;
+}
+
+.name {
+  font-size: 0.65rem;
+  color: rgba(255,255,255,0.8);
+}
+
+.income {
+  font-size: 0.6rem;
+  color: #a0c4ff;
+}
+
+.closeBtn {
+  width: 100%;
+  padding: 12px;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 12px;
+  color: white;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.closeBtn:hover {
+  background: rgba(255,255,255,0.15);
+}

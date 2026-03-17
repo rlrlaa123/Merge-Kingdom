@@ -1,0 +1,16 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  padding: 16px;
+  width: 100%;
+  max-width: 360px;
+  margin: 0 auto;
+}
+
+.dragOverlay {
+  font-size: clamp(2rem, 7vw, 3rem);
+  filter: drop-shadow(0 4px 12px rgba(0,0,0,0.6));
+  opacity: 0.9;
+  transform: scale(1.15);
+}

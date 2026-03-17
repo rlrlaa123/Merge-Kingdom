@@ -1,0 +1,39 @@
+.bottomBar {
+  padding: 16px;
+  display: flex;
+  justify-content: center;
+  background: rgba(255,255,255,0.03);
+  border-top: 1px solid rgba(255,255,255,0.08);
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+}
+
+.spawnBtn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 14px 40px;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  border: none;
+  border-radius: 16px;
+  color: white;
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(102,126,234,0.4);
+  min-width: 180px;
+  min-height: 44px;
+}
+
+.spawnBtn.disabled {
+  background: linear-gradient(135deg, #444, #333);
+  box-shadow: none;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.cost {
+  font-size: 0.8rem;
+  opacity: 0.85;
+  font-weight: 500;
+}

@@ -17,7 +17,6 @@ const useGameStore = create((set, get) => ({
   lastTick: Date.now(),
   lastSaved: Date.now(),
   floatingTexts: [],
-  newItemIds: new Set(), // 소환된 직후 아이템 ID (pop-in 애니메이션용)
 
   spawnItem: () => {
     const { grid, coins, totalSpawns } = get();
@@ -28,14 +27,7 @@ const useGameStore = create((set, get) => ({
     const item = newItem(1);
     const newGrid = cloneGrid(grid);
     newGrid[cell.r][cell.c] = item;
-    const newItemIds = new Set(get().newItemIds);
-    newItemIds.add(item.id);
-    set({ grid: newGrid, coins: coins - cost, totalSpawns: totalSpawns + 1, newItemIds });
-    setTimeout(() => {
-      const ids = new Set(get().newItemIds);
-      ids.delete(item.id);
-      set({ newItemIds: ids });
-    }, 500);
+    set({ grid: newGrid, coins: coins - cost, totalSpawns: totalSpawns + 1 });
     return true;
   },
 
@@ -53,18 +45,10 @@ const useGameStore = create((set, get) => ({
     newGrid[toR][toC] = mergedItem;
     const newDiscovered = new Set(discovered);
     newDiscovered.add(newLevel);
-    const newItemIds = new Set(get().newItemIds);
-    newItemIds.add(mergedItem.id);
-    setTimeout(() => {
-      const ids = new Set(get().newItemIds);
-      ids.delete(mergedItem.id);
-      set({ newItemIds: ids });
-    }, 500);
     set(state => ({
       grid: newGrid,
       coins: state.coins + bonus,
       discovered: newDiscovered,
-      newItemIds,
     }));
     get().addFloatingText(`+${bonus} 🪙`, toR, toC);
     return true;

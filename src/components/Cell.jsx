@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, memo } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { AnimatePresence, motion } from 'framer-motion';
 import Item from './Item';
@@ -6,7 +6,7 @@ import { cellKey } from '../utils/gridHelpers';
 import useGameStore from '../store/useGameStore';
 import styles from './Cell.module.css';
 
-const Cell = ({ r, c, item, isMergeTarget, isMergedCell }) => {
+const Cell = memo(({ r, c, item, isMergeTarget, isMergedCell }) => {
   const key = cellKey(r, c);
   const { setNodeRef, isOver } = useDroppable({ id: `cell-${key}`, data: { r, c } });
   const allFloatingTexts = useGameStore(s => s.floatingTexts);
@@ -49,5 +49,7 @@ const Cell = ({ r, c, item, isMergeTarget, isMergedCell }) => {
     </div>
   );
 };
+
+});
 
 export default Cell;

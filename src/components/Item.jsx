@@ -1,7 +1,7 @@
+import { useRef } from 'react';
 import { useDraggable } from '@dnd-kit/core';
 import { motion } from 'framer-motion';
 import { getItem } from '../data/mergeTree';
-import useGameStore from '../store/useGameStore';
 import styles from './Item.module.css';
 
 const Item = ({ id, level, cellKey, isMerged }) => {
@@ -10,7 +10,9 @@ const Item = ({ id, level, cellKey, isMerged }) => {
     data: { itemId: id, cellKey },
   });
 
-  const isNew = useGameStore(s => s.newItemIds.has(id));
+  // 마운트 시 한 번만 결정 — 이후 변경 없음
+  const initialRef = useRef({ scale: 0.5, opacity: 0 });
+
   const itemData = getItem(level);
 
   return (
@@ -20,7 +22,7 @@ const Item = ({ id, level, cellKey, isMerged }) => {
       {...attributes}
       className={styles.item}
       style={{ opacity: isDragging ? 0 : 1 }}
-      initial={isNew ? { scale: 0.5, opacity: 0 } : false}
+      initial={initialRef.current}
       animate={{ scale: 1, opacity: isDragging ? 0 : 1 }}
       exit={{ scale: 0.3, opacity: 0, transition: { duration: 0.1 } }}
       transition={{ type: 'spring', stiffness: 480, damping: 26 }}

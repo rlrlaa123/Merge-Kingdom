@@ -13,16 +13,38 @@
   -webkit-user-select: none;
   -webkit-touch-callout: none;
   gap: 2px;
+  transition: transform 0.1s;
 }
 
 .item:active {
   cursor: grabbing;
+  transform: scale(0.9);
+}
+
+.fresh {
+  animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+@keyframes popIn {
+  0% { transform: scale(0.5); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
 }
 
 .emoji {
   font-size: clamp(1.5rem, 5vw, 2.2rem);
   line-height: 1;
   filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));
+}
+
+.mergedEmoji {
+  animation: glowPulse 0.45s ease-out forwards;
+}
+
+@keyframes glowPulse {
+  0% { transform: scale(1); filter: drop-shadow(0 0 0px rgba(255,215,0,0)); }
+  40% { transform: scale(1.45); filter: drop-shadow(0 0 14px rgba(255,215,0,0.9)); }
+  80% { transform: scale(0.9); filter: drop-shadow(0 0 4px rgba(255,215,0,0.5)); }
+  100% { transform: scale(1); filter: drop-shadow(0 0 0px rgba(255,215,0,0)); }
 }
 
 .level {

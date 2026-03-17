@@ -3,7 +3,7 @@ import { createEmptyGrid, getRandomEmptyCell, cloneGrid } from '../utils/gridHel
 import { getItem, MAX_LEVEL } from '../data/mergeTree';
 
 let itemIdCounter = 1;
-const newItem = (level) => ({ id: itemIdCounter++, level });
+const newItem = (level) => ({ id: Date.now().toString(36) + Math.random().toString(36).substr(2), level });
 
 const FRESH_DURATION = 600; // pop-in 애니메이션 재생 시간
 

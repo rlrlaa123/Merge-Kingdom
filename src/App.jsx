@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import TopBar from './components/TopBar';
 import Grid from './components/Grid';
 import BottomBar from './components/BottomBar';
@@ -13,6 +13,13 @@ import './styles/global.css';
 function Game() {
   const [collectionOpen, setCollectionOpen] = useState(false);
   const { reward, clearReward } = useOfflineReward();
+
+  useEffect(() => {
+    import('vconsole').then(({ default: VConsole }) => {
+      new VConsole({ theme: 'dark' });
+      console.log('[DEBUG] VConsole initialized');
+    });
+  }, []);
 
   useAutoIncome();
   useAutoSave();

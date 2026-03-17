@@ -1,12 +1,16 @@
-import { memo } from 'react';
+import { memo, useRef } from 'react';
 import { getItem } from '../data/mergeTree';
 import useGameStore from '../store/useGameStore';
 import styles from './Item.module.css';
 
-// 순수 프레젠테이션 컴포넌트. @dnd-kit 훅 없음 → 드래그 컨텍스트 변경 시 리렌더링 차단.
 const Item = memo(({ id, level, isMerged, isDragging, dragRef, dragListeners, dragAttributes }) => {
+  const renderCount = useRef(0);
+  renderCount.current += 1;
   const isFresh = useGameStore(s => s.freshItemIds.has(id));
   const itemData = getItem(level);
+
+  // 렌더링 추적 - 드래그 중 다른 아이템이 리렌더되면 이 로그가 찍힘
+  console.log(`[Item] id=${id} level=${level} isDragging=${isDragging} isFresh=${isFresh} render=#${renderCount.current}`);
 
   return (
     <div

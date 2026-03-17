@@ -24,7 +24,7 @@ const Grid = () => {
   const [mergeTargetKey, setMergeTargetKey] = useState(null);
 
   const mouseSensor = useSensor(MouseSensor, { activationConstraint: { distance: 5 } });
-  const touchSensor = useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } });
+  const touchSensor = useSensor(TouchSensor, { activationConstraint: { delay: 50, tolerance: 8 } });
   const sensors = useSensors(mouseSensor, touchSensor);
 
   const handleDragStart = ({ active }) => {

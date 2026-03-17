@@ -16,6 +16,7 @@ body {
   color: white;
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior: none;
+  touch-action: none;
 }
 
 .app {

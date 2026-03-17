@@ -10,6 +10,7 @@
   position: relative;
   overflow: visible;
   min-height: clamp(52px, 14vw, 76px);
+  touch-action: none;
 }
 
 .cell.over {

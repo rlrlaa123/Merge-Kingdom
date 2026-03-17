@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { AnimatePresence, motion } from 'framer-motion';
 import Item from './Item';
@@ -8,7 +9,11 @@ import styles from './Cell.module.css';
 const Cell = ({ r, c, item, isMergeTarget, isMergedCell }) => {
   const key = cellKey(r, c);
   const { setNodeRef, isOver } = useDroppable({ id: `cell-${key}`, data: { r, c } });
-  const floatingTexts = useGameStore(s => s.floatingTexts.filter(t => t.r === r && t.c === c));
+  const allFloatingTexts = useGameStore(s => s.floatingTexts);
+  const floatingTexts = useMemo(
+    () => allFloatingTexts.filter(t => t.r === r && t.c === c),
+    [allFloatingTexts, r, c]
+  );
 
   return (
     <div

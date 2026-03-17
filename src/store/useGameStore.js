@@ -5,6 +5,8 @@ import { getItem, MAX_LEVEL } from '../data/mergeTree';
 let itemIdCounter = 1;
 const newItem = (level) => ({ id: itemIdCounter++, level });
 
+const FRESH_DURATION = 600; // pop-in 애니메이션 재생 시간
+
 const SAVE_KEY = 'merge-kingdom-save';
 
 const calcSpawnCost = (totalSpawns) => Math.floor(10 * Math.pow(1.15, totalSpawns));
@@ -17,6 +19,18 @@ const useGameStore = create((set, get) => ({
   lastTick: Date.now(),
   lastSaved: Date.now(),
   floatingTexts: [],
+  freshItemIds: new Set(),
+
+  _markFresh: (id) => {
+    set(state => ({ freshItemIds: new Set([...state.freshItemIds, id]) }));
+    setTimeout(() => {
+      set(state => {
+        const next = new Set(state.freshItemIds);
+        next.delete(id);
+        return { freshItemIds: next };
+      });
+    }, FRESH_DURATION);
+  },
 
   spawnItem: () => {
     const { grid, coins, totalSpawns } = get();
@@ -28,6 +42,7 @@ const useGameStore = create((set, get) => ({
     const newGrid = cloneGrid(grid);
     newGrid[cell.r][cell.c] = item;
     set({ grid: newGrid, coins: coins - cost, totalSpawns: totalSpawns + 1 });
+    get()._markFresh(item.id);
     return true;
   },
 
@@ -51,6 +66,7 @@ const useGameStore = create((set, get) => ({
       discovered: newDiscovered,
     }));
     get().addFloatingText(`+${bonus} 🪙`, toR, toC);
+    get()._markFresh(mergedItem.id);
     return true;
   },
 

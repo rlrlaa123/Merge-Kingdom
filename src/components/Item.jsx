@@ -1,7 +1,7 @@
-import { useRef } from 'react';
 import { useDraggable } from '@dnd-kit/core';
 import { motion } from 'framer-motion';
 import { getItem } from '../data/mergeTree';
+import useGameStore from '../store/useGameStore';
 import styles from './Item.module.css';
 
 const Item = ({ id, level, cellKey, isMerged }) => {
@@ -10,8 +10,9 @@ const Item = ({ id, level, cellKey, isMerged }) => {
     data: { itemId: id, cellKey },
   });
 
-  // 마운트 시 항상 pop-in (dropAnimation=null이므로 Overlay와 겹치지 않음)
-  const initialRef = useRef({ scale: 0.5, opacity: 0 });
+  // spawn/merge로 새로 생성된 아이템만 pop-in 애니메이션
+  // swap/move된 아이템은 initial=false로 즉시 표시 (overshoot 방지)
+  const isFresh = useGameStore(s => s.freshItemIds.has(id));
 
   const itemData = getItem(level);
 
@@ -22,7 +23,7 @@ const Item = ({ id, level, cellKey, isMerged }) => {
       {...attributes}
       className={styles.item}
       style={{ opacity: isDragging ? 0 : 1 }}
-      initial={initialRef.current}
+      initial={isFresh ? { scale: 0.5, opacity: 0 } : false}
       animate={{ scale: 1, opacity: isDragging ? 0 : 1 }}
       exit={{ scale: 0.3, opacity: 0, transition: { duration: 0.1 } }}
       transition={{ type: 'spring', stiffness: 480, damping: 26 }}

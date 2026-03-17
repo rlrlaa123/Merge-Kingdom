@@ -10,7 +10,7 @@ const Item = ({ id, level, cellKey, isMerged }) => {
     data: { itemId: id, cellKey },
   });
 
-  // 마운트 시 한 번만 결정 — 이후 변경 없음
+  // 마운트 시 항상 pop-in (dropAnimation=null이므로 Overlay와 겹치지 않음)
   const initialRef = useRef({ scale: 0.5, opacity: 0 });
 
   const itemData = getItem(level);

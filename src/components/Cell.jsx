@@ -48,8 +48,6 @@ const Cell = memo(({ r, c, item, isMergeTarget, isMergedCell }) => {
       </AnimatePresence>
     </div>
   );
-};
-
 });
 
 export default Cell;

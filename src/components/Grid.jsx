@@ -90,7 +90,12 @@ const Grid = () => {
           ))
         )}
       </div>
-      <DragOverlay dropAnimation={null}>
+      <DragOverlay
+        dropAnimation={{
+          duration: 120,
+          easing: 'ease-out',
+        }}
+      >
         {draggingItem && (
           <div className={styles.dragOverlay}>
             <span>{getItem(draggingItem.level).emoji}</span>

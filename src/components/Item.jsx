@@ -17,20 +17,24 @@ const Item = ({ id, level, cellKey, isMerged }) => {
       {...listeners}
       {...attributes}
       className={styles.item}
-      style={{ opacity: isDragging ? 0.25 : 1 }}
-      initial={{ scale: 0, rotate: -10 }}
-      animate={{ scale: 1, rotate: 0 }}
-      exit={{ scale: 0, opacity: 0 }}
-      transition={{ type: 'spring', stiffness: 500, damping: 22 }}
-      whileTap={{ scale: 0.88 }}
+      style={{ opacity: isDragging ? 0 : 1 }}
+      initial={{ scale: 0.6, opacity: 0 }}
+      animate={{ scale: 1, opacity: isDragging ? 0 : 1 }}
+      exit={{ scale: 0.4, opacity: 0, transition: { duration: 0.12 } }}
+      transition={{ type: 'spring', stiffness: 450, damping: 24 }}
+      whileTap={{ scale: 0.9 }}
     >
       <motion.span
         className={styles.emoji}
         animate={isMerged ? {
-          scale: [1, 1.5, 0.85, 1.1, 1],
-          filter: ['drop-shadow(0 0 0px gold)', 'drop-shadow(0 0 12px gold)', 'drop-shadow(0 0 0px gold)'],
-        } : {}}
-        transition={{ duration: 0.5 }}
+          scale: [1, 1.45, 0.9, 1.1, 1],
+          filter: [
+            'drop-shadow(0 0 0px rgba(255,215,0,0))',
+            'drop-shadow(0 0 14px rgba(255,215,0,0.9))',
+            'drop-shadow(0 0 0px rgba(255,215,0,0))',
+          ],
+        } : { scale: 1 }}
+        transition={{ duration: 0.45 }}
       >
         {itemData.emoji}
       </motion.span>

@@ -2,9 +2,10 @@
   position: relative;
   aspect-ratio: 1;
   background: rgba(255,255,255,0.08);
-  border-radius: 10px;
+  border-radius: 12px;
   border: 1.5px solid rgba(255,255,255,0.15);
   transition: all 0.15s ease;
+  min-height: 0;
 }
 
 .cell.over {

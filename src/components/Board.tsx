@@ -88,7 +88,10 @@ const Board = () => {
     >
       <div
         className={styles.board}
-        style={{ gridTemplateColumns: `repeat(${boardSize}, 1fr)` }}
+        style={{
+          gridTemplateColumns: `repeat(${boardSize}, 1fr)`,
+          gridTemplateRows: `repeat(${boardSize}, 1fr)`,
+        }}
       >
         {Array.from({ length: boardSize }, (_, r) =>
           Array.from({ length: boardSize }, (_, c) => (

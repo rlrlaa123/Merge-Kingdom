@@ -10,6 +10,9 @@ const CollectionModal = ({ open, onClose }) => {
 
   if (!open) return null;
 
+  const isDiscovered = (treeId, level) =>
+    discovered.has(`${treeId}-${level}`) || discovered.has(level); // 이전 형식 호환
+
   return (
     <div ref={overlayRef} className={styles.overlay} onClick={e => e.target === overlayRef.current && onClose()}>
       <div className={styles.modal}>
@@ -18,15 +21,16 @@ const CollectionModal = ({ open, onClose }) => {
           <div key={tree.id}>
             <h3 className={styles.treeTitle}>{tree.icon} {tree.name}</h3>
             <div className={styles.grid}>
-              {tree.items.map(item => (
-                <div key={`${tree.id}-${item.level}`} className={`${styles.card} ${!discovered.has(item.level) ? styles.locked : ''}`}>
-                  <span className={styles.emoji}>{discovered.has(item.level) ? item.emoji : '❓'}</span>
-                  <span className={styles.name}>{discovered.has(item.level) ? item.name : '???'}</span>
-                  {discovered.has(item.level) && (
-                    <span className={styles.income}>+{item.coinsPerSec}/초</span>
-                  )}
-                </div>
-              ))}
+              {tree.items.map(item => {
+                const found = isDiscovered(tree.id, item.level);
+                return (
+                  <div key={`${tree.id}-${item.level}`} className={`${styles.card} ${!found ? styles.locked : ''}`}>
+                    <span className={styles.emoji}>{found ? item.emoji : '❓'}</span>
+                    <span className={styles.name}>{found ? item.name : '???'}</span>
+                    {found && <span className={styles.income}>+{item.coinsPerSec}/초</span>}
+                  </div>
+                );
+              })}
             </div>
           </div>
         ))}

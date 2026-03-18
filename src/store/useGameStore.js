@@ -23,7 +23,15 @@ const checkQuestProgress = (stats, discovered) => {
       case 'spawn':       progress[q.id] = Math.min(stats.totalSpawns, q.target); break;
       case 'reach_level': progress[q.id] = stats.maxLevel >= q.target ? q.target : 0; break;
       case 'earn_coins':  progress[q.id] = Math.min(Math.floor(stats.totalCoinsEarned), q.target); break;
-      case 'collect':     progress[q.id] = Math.min(discovered.size, q.target); break;
+      case 'collect': {
+        // 모든 트리 통틀어 고유 레벨 수
+        const uniqueLevels = new Set([...discovered].map(k => {
+          const parts = k.toString().split('-');
+          return parts.length === 2 ? parseInt(parts[1]) : parseInt(k);
+        }));
+        progress[q.id] = Math.min(uniqueLevels.size, q.target);
+        break;
+      }
     }
   }
   return progress;
@@ -38,8 +46,8 @@ const useGameStore = create((set, get) => ({
   coins: 100,
   totalSpawns: 0,
 
-  // --- 도감 & 트리 ---
-  discovered: new Set([1]),
+  // --- 도감 & 트리 --- (트리-레벨 키: 'animal-1', 'plant-3' 등)
+  discovered: new Set(['animal-1']),
   activeTree: 'animal',
   unlockedTrees: ['animal'],
 
@@ -89,10 +97,13 @@ const useGameStore = create((set, get) => ({
     const item = newItem(1, activeTree);
     const newGrid = cloneGrid(grid);
     newGrid[cell.r][cell.c] = item;
+    const newDiscovered = new Set(get().discovered);
+    newDiscovered.add(`${activeTree}-1`);
     set(state => ({
       grid: newGrid,
       coins: coins - cost,
       totalSpawns: totalSpawns + 1,
+      discovered: newDiscovered,
       stats: { ...state.stats, totalSpawns: state.stats.totalSpawns + 1 },
     }));
     get()._markFresh(item.id);
@@ -118,7 +129,7 @@ const useGameStore = create((set, get) => ({
     newGrid[fromR][fromC] = null;
     newGrid[toR][toC] = mergedItem;
     const newDiscovered = new Set(discovered);
-    newDiscovered.add(newLevel);
+    newDiscovered.add(`${tree}-${newLevel}`);
     set(state => ({
       grid: newGrid,
       coins: state.coins + bonus,
@@ -250,7 +261,9 @@ const useGameStore = create((set, get) => ({
         grid: data.grid,
         coins: data.coins,
         totalSpawns: data.totalSpawns,
-        discovered: new Set(data.discovered),
+        discovered: new Set(
+          data.discovered.map(d => typeof d === 'number' ? `animal-${d}` : d)
+        ),
         lastTick: Date.now(),
       };
       // v2 필드 호환
@@ -294,7 +307,7 @@ const useGameStore = create((set, get) => ({
       gridSize: DEFAULT_GRID_SIZE,
       coins: 100,
       totalSpawns: 0,
-      discovered: new Set([1]),
+      discovered: new Set(['animal-1']),
       activeTree: 'animal',
       unlockedTrees: ['animal'],
       stats: { totalMerges: 0, totalSpawns: 0, maxLevel: 1, totalCoinsEarned: 0 },

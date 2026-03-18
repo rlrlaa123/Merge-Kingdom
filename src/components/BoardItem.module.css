@@ -1,0 +1,35 @@
+.item {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+  cursor: grab;
+  z-index: 1;
+}
+
+.item:active {
+  cursor: grabbing;
+}
+
+.dragging {
+  opacity: 0.3;
+}
+
+.emoji {
+  font-size: 1.8rem;
+  user-select: none;
+  -webkit-user-select: none;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3));
+}
+
+/* 등장 애니메이션 */
+.item {
+  animation: popIn 0.2s ease-out;
+}
+
+@keyframes popIn {
+  from { transform: scale(0.5); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}

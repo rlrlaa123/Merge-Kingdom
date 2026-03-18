@@ -1,0 +1,75 @@
+import useGameStore from '../store/gameStore';
+import styles from './OrderBoard.module.css';
+
+const DIFF_CLASS: Record<string, string> = {
+  easy: styles.easy,
+  medium: styles.medium,
+  hard: styles.hard,
+};
+
+const OrderBoard = () => {
+  const orders = useGameStore(s => s.orders);
+  const canDeliver = useGameStore(s => s.canDeliver);
+  const deliverOrder = useGameStore(s => s.deliverOrder);
+  const skipOrder = useGameStore(s => s.skipOrder);
+  const board = useGameStore(s => s.board);
+  const boardSize = useGameStore(s => s.boardSize);
+
+  // 보드 아이템 카운팅
+  const available: Record<string, number> = {};
+  for (let r = 0; r < boardSize; r++)
+    for (let c = 0; c < boardSize; c++) {
+      const item = board[r]?.[c];
+      if (item) {
+        const key = `${item.chain}-${item.level}`;
+        available[key] = (available[key] || 0) + 1;
+      }
+    }
+
+  return (
+    <div className={styles.board}>
+      {orders.map(order => {
+        const deliverable = canDeliver(order.id);
+        const diffClass = DIFF_CLASS[order.difficulty] || '';
+        return (
+          <div key={order.id} className={`${styles.card} ${diffClass} ${deliverable ? styles.ready : ''}`}>
+            <div className={styles.header}>
+              <span className={styles.character}>{order.characterEmoji}</span>
+              <span className={styles.name}>{order.characterName}</span>
+            </div>
+            <div className={styles.dialogue}>"{order.dialogue}"</div>
+            <div className={styles.items}>
+              {order.items.map((item, i) => {
+                const key = `${item.chain}-${item.level}`;
+                const have = available[key] || 0;
+                const met = have >= item.quantity;
+                return (
+                  <span key={i} className={`${styles.req} ${met ? styles.met : ''}`}>
+                    {item.emoji}×{item.quantity}
+                  </span>
+                );
+              })}
+            </div>
+            <div className={styles.reward}>
+              🪙{order.coinReward} ⭐{order.fameReward}
+            </div>
+            <div className={styles.actions}>
+              <button
+                className={styles.deliverBtn}
+                disabled={!deliverable}
+                onClick={() => deliverOrder(order.id)}
+              >
+                납품
+              </button>
+              <button className={styles.skipBtn} onClick={() => skipOrder(order.id)}>
+                ↻
+              </button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+export default OrderBoard;

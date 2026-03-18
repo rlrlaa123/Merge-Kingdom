@@ -5,6 +5,7 @@ import Grid from './components/Grid';
 import BottomBar from './components/BottomBar';
 import CollectionModal from './components/CollectionModal';
 import QuestModal from './components/QuestModal';
+import SettingsModal from './components/SettingsModal';
 import OfflineRewardModal from './components/OfflineRewardModal';
 import ErrorBoundary from './components/ErrorBoundary';
 import { useAutoIncome } from './hooks/useAutoIncome';
@@ -15,6 +16,7 @@ import './styles/global.css';
 function Game() {
   const [collectionOpen, setCollectionOpen] = useState(false);
   const [questsOpen, setQuestsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const { reward, clearReward } = useOfflineReward();
 
   useAutoIncome();
@@ -35,6 +37,7 @@ function Game() {
       <TopBar
         onOpenCollection={() => setCollectionOpen(true)}
         onOpenQuests={() => setQuestsOpen(true)}
+        onOpenSettings={() => setSettingsOpen(true)}
       />
       <main className="main">
         <ErrorBoundary>
@@ -44,6 +47,7 @@ function Game() {
       <BottomBar />
       <CollectionModal open={collectionOpen} onClose={() => setCollectionOpen(false)} />
       <QuestModal open={questsOpen} onClose={() => setQuestsOpen(false)} />
+      <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <OfflineRewardModal reward={reward} onClose={clearReward} />
     </div>
   );

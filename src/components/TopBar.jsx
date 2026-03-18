@@ -4,7 +4,7 @@ import { QUESTS } from '../data/quests';
 import { formatNumber } from '../utils/formatNumber';
 import styles from './TopBar.module.css';
 
-const TopBar = ({ onOpenCollection, onOpenQuests }) => {
+const TopBar = ({ onOpenCollection, onOpenQuests, onOpenSettings }) => {
   const coins = useGameStore(s => s.coins);
   const incomePerSec = useGameStore(s => s.getIncomePerSec());
   const questProgress = useGameStore(s => s.questProgress);
@@ -52,6 +52,7 @@ const TopBar = ({ onOpenCollection, onOpenQuests }) => {
           {claimableCount > 0 && <span className={styles.badge}>{claimableCount}</span>}
         </button>
         <button className={styles.iconBtn} onClick={onOpenCollection}>📖</button>
+        <button className={styles.iconBtn} onClick={onOpenSettings}>⚙️</button>
       </div>
     </div>
   );

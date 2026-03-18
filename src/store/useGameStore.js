@@ -287,6 +287,26 @@ const useGameStore = create((set, get) => ({
     }, 1200);
   },
 
+  resetGame: () => {
+    localStorage.removeItem(SAVE_KEY);
+    set({
+      grid: createEmptyGrid(),
+      gridSize: DEFAULT_GRID_SIZE,
+      coins: 100,
+      totalSpawns: 0,
+      discovered: new Set([1]),
+      activeTree: 'animal',
+      unlockedTrees: ['animal'],
+      stats: { totalMerges: 0, totalSpawns: 0, maxLevel: 1, totalCoinsEarned: 0 },
+      questProgress: {},
+      claimedQuests: [],
+      lastTick: Date.now(),
+      lastSaved: Date.now(),
+      floatingTexts: [],
+      freshItemIds: new Set(),
+    });
+  },
+
   getSpawnCost: () => calcSpawnCost(get().totalSpawns),
 
   getIncomePerSec: () => {

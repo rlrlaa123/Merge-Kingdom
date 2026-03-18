@@ -14,6 +14,9 @@ export const useOfflineReward = () => {
         useGameStore.setState(state => ({ coins: state.coins + income }));
         setReward({ income, elapsed });
       }
+    } else {
+      // 신규 시작 — 주문 슬롯 채우기
+      useGameStore.getState().initOrders();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

@@ -3,7 +3,7 @@ import { getRandomEmptyCell, cloneGrid } from '../utils/gridHelpers';
 import { createEmptyGrid, findEmptyCells, GRID_SIZE as DEFAULT_GRID_SIZE } from '../utils/gridHelpers';
 import { getTreeItem, MAX_LEVEL, KINGDOM_LEVELS, getKingdomLevel, getNextKingdomLevel } from '../data/mergeTree';
 import { QUESTS } from '../data/quests';
-import { generateOrder } from '../data/orders';
+import { generateOrder, rollDifficulty } from '../data/orders';
 
 const newItem = (level, tree = 'animal', special = null) => ({
   id: Date.now().toString(36) + Math.random().toString(36).substr(2),
@@ -70,7 +70,7 @@ const useGameStore = create((set, get) => ({
   boostActive: false, boostEndTime: null, boostCooldownEnd: null,
 
   // 주문
-  orders: [], maxOrders: 3, nextOrderAt: Date.now() + 10_000, totalDeliveries: 0,
+  orders: [], maxOrders: 3, orderSlotCooldowns: {}, totalDeliveries: 0,
 
   // 명성 & 왕국
   fame: 0, kingdomLevel: 1, levelUpUnlock: null, // 레벨업 알림용
@@ -207,14 +207,38 @@ const useGameStore = create((set, get) => ({
   moveItem: (fromR, fromC, toR, toC) => { const g = cloneGrid(get().grid); g[toR][toC] = g[fromR][fromC]; g[fromR][fromC] = null; set({ grid: g }); },
 
   // === 주문 ===
-  tickOrders: () => {
-    const { orders, maxOrders, nextOrderAt, totalDeliveries, unlockedTrees } = get();
-    const now = Date.now();
-    if (orders.length < maxOrders && nextOrderAt && now >= nextOrderAt) {
-      const order = generateOrder(totalDeliveries, unlockedTrees);
-      const nextDelay = 60_000 + Math.random() * 60_000;
-      set({ orders: [...orders, order], nextOrderAt: now + nextDelay });
+  initOrders: () => {
+    const { orders, maxOrders, totalDeliveries, unlockedTrees } = get();
+    const newOrders = [...orders];
+    while (newOrders.length < maxOrders) {
+      const diff = rollDifficulty();
+      newOrders.push(generateOrder(totalDeliveries, unlockedTrees, diff));
     }
+    set({ orders: newOrders, orderSlotCooldowns: {} });
+  },
+
+  tickOrders: () => {
+    const { orders, maxOrders, orderSlotCooldowns, totalDeliveries, unlockedTrees } = get();
+    const now = Date.now();
+    let changed = false;
+    const newCooldowns = { ...orderSlotCooldowns };
+
+    // 쿨다운 만료 체크
+    for (const [slot, endTime] of Object.entries(newCooldowns)) {
+      if (now >= endTime) { delete newCooldowns[slot]; changed = true; }
+    }
+
+    // 빈 슬롯 채우기 (쿨다운 아닌 슬롯만)
+    const newOrders = [...orders];
+    while (newOrders.length < maxOrders) {
+      const slotIdx = newOrders.length;
+      if (newCooldowns[slotIdx]) break;
+      const diff = rollDifficulty();
+      newOrders.push(generateOrder(totalDeliveries, unlockedTrees, diff));
+      changed = true;
+    }
+
+    if (changed) set({ orders: newOrders, orderSlotCooldowns: newCooldowns });
   },
 
   canDeliver: (orderId) => {
@@ -239,13 +263,12 @@ const useGameStore = create((set, get) => ({
   },
 
   deliverOrder: (orderId) => {
-    const { orders, grid, gridSize, permanentBuffs } = get();
+    const { orders, grid, gridSize, permanentBuffs, totalDeliveries, unlockedTrees } = get();
     const order = orders.find(o => o.id === orderId);
     if (!order || !get().canDeliver(orderId)) return false;
 
     const newGrid = cloneGrid(grid);
     const ht = { ...get().harvestTimers };
-    // 그리드에서 아이템 제거
     for (const req of order.requirements) {
       let remaining = req.count;
       for (let r = 0; r < gridSize && remaining > 0; r++)
@@ -262,26 +285,37 @@ const useGameStore = create((set, get) => ({
     const rewardMult = permanentBuffs.includes('orderReward') ? 1.5 : 1;
     const coinReward = Math.floor(order.coinReward * get().getBoostMultiplier() * rewardMult);
     const fameReward = order.fameReward;
+    const newDeliveries = totalDeliveries + 1;
+
+    // 즉시 새 주문으로 교체
+    const diff = rollDifficulty();
+    const newOrder = generateOrder(newDeliveries, unlockedTrees, diff);
+    const newOrders = orders.map(o => o.id === orderId ? newOrder : o);
 
     set(s => ({
       grid: newGrid,
       coins: s.coins + coinReward,
-      orders: s.orders.filter(o => o.id !== orderId),
-      totalDeliveries: s.totalDeliveries + 1,
+      orders: newOrders,
+      totalDeliveries: newDeliveries,
       harvestTimers: ht,
       stats: { ...s.stats, totalCoinsEarned: s.stats.totalCoinsEarned + coinReward },
     }));
     get().addFame(fameReward);
-    get().addFloatingText(`+${coinReward} 🪙 +${fameReward} ⭐`, 2, 2);
+    get().addFloatingText(`+${coinReward} 🪙 +${fameReward} ⭐`, 1, 2);
     get()._updateQuestProgress();
     return true;
   },
 
   skipOrder: (orderId) => {
-    set(s => ({
-      orders: s.orders.filter(o => o.id !== orderId),
-      nextOrderAt: Date.now() + 60_000, // 60초 패널티
-    }));
+    const { orders } = get();
+    const slotIndex = orders.findIndex(o => o.id === orderId);
+    if (slotIndex === -1) return;
+    const newOrders = [...orders];
+    newOrders.splice(slotIndex, 1);
+    set({
+      orders: newOrders,
+      orderSlotCooldowns: { ...get().orderSlotCooldowns, [slotIndex]: Date.now() + 10_000 },
+    });
   },
 
   // === 명성 & 왕국 레벨 ===
@@ -427,7 +461,7 @@ const useGameStore = create((set, get) => ({
       freeSpawnCharges: 3, lastFreeSpawnTick: Date.now(),
       comboCount: 0, lastMergeTime: 0, harvestTimers: {},
       boostActive: false, boostEndTime: null, boostCooldownEnd: null,
-      orders: [], maxOrders: 3, nextOrderAt: Date.now() + 10_000, totalDeliveries: 0,
+      orders: [], maxOrders: 3, orderSlotCooldowns: {}, totalDeliveries: 0,
       fame: 0, kingdomLevel: 1, levelUpUnlock: null,
       crownPoints: s.crownPoints + crowns,
       totalPrestiges: s.totalPrestiges + 1,
@@ -483,7 +517,7 @@ const useGameStore = create((set, get) => ({
       gridSize: s.gridSize, activeTree: s.activeTree, unlockedTrees: s.unlockedTrees,
       freeSpawnCharges: s.freeSpawnCharges, lastFreeSpawnTick: s.lastFreeSpawnTick,
       boostCooldownEnd: s.boostCooldownEnd, harvestTimers: s.harvestTimers,
-      orders: s.orders, maxOrders: s.maxOrders, nextOrderAt: s.nextOrderAt, totalDeliveries: s.totalDeliveries,
+      orders: s.orders, maxOrders: s.maxOrders, orderSlotCooldowns: s.orderSlotCooldowns, totalDeliveries: s.totalDeliveries,
       fame: s.fame, kingdomLevel: s.kingdomLevel,
       crownPoints: s.crownPoints, totalPrestiges: s.totalPrestiges, permanentBuffs: s.permanentBuffs,
       savedAt: Date.now(),
@@ -503,10 +537,10 @@ const useGameStore = create((set, get) => ({
       };
       // 호환
       ['stats','claimedQuests','gridSize','activeTree','unlockedTrees','freeSpawnCharges','lastFreeSpawnTick',
-       'boostCooldownEnd','harvestTimers','orders','maxOrders','nextOrderAt','totalDeliveries',
+       'boostCooldownEnd','harvestTimers','orders','maxOrders','orderSlotCooldowns','totalDeliveries',
        'fame','kingdomLevel','crownPoints','totalPrestiges','permanentBuffs'].forEach(k => { if (d[k] != null) st[k] = d[k]; });
       set(st);
-      setTimeout(() => { get().tickFreeSpawn(); get()._updateQuestProgress(); }, 0);
+      setTimeout(() => { get().tickFreeSpawn(); get()._updateQuestProgress(); get().initOrders(); }, 0);
       return d;
     } catch { return null; }
   },
@@ -537,7 +571,7 @@ const useGameStore = create((set, get) => ({
       questProgress: {}, claimedQuests: [],
       freeSpawnCharges: 3, lastFreeSpawnTick: Date.now(), comboCount: 0, lastMergeTime: 0,
       harvestTimers: {}, boostActive: false, boostEndTime: null, boostCooldownEnd: null,
-      orders: [], maxOrders: 3, nextOrderAt: Date.now() + 10_000, totalDeliveries: 0,
+      orders: [], maxOrders: 3, orderSlotCooldowns: {}, totalDeliveries: 0,
       fame: 0, kingdomLevel: 1, levelUpUnlock: null,
       crownPoints: 0, totalPrestiges: 0, permanentBuffs: [],
       lastTick: Date.now(), lastSaved: Date.now(), floatingTexts: [], freshItemIds: new Set(),

@@ -16,20 +16,38 @@
   padding: 8px 10px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  min-width: 130px;
+  gap: 3px;
+  min-width: 120px;
 }
 
-.card.ready {
-  border-color: #ffd700;
-  background: rgba(255,215,0,0.08);
+/* 난이도 색상 */
+.easy { border-color: rgba(46,204,113,0.4); background: rgba(46,204,113,0.06); }
+.normal { border-color: rgba(52,152,219,0.4); background: rgba(52,152,219,0.06); }
+.hard { border-color: rgba(155,89,182,0.5); background: rgba(155,89,182,0.08); }
+
+.card.ready { border-color: #ffd700; background: rgba(255,215,0,0.08); }
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.label {
+  font-size: 0.6rem;
+  color: rgba(255,255,255,0.5);
+}
+
+.hardBadge {
+  font-size: 0.55rem;
+  color: #e8b4f8;
+  font-weight: 700;
 }
 
 .items {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  font-size: 0.85rem;
 }
 
 .req {
@@ -42,12 +60,10 @@
   font-size: 0.75rem;
 }
 
-.req.met {
-  background: rgba(46,204,113,0.15);
-}
+.req.met { background: rgba(46,204,113,0.15); }
 
 .reward {
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   color: #ffd700;
   font-weight: 600;
 }
@@ -83,4 +99,24 @@
   color: rgba(255,255,255,0.5);
   font-size: 0.7rem;
   cursor: pointer;
+}
+
+/* 쿨다운 슬롯 */
+.cooldownCard {
+  justify-content: center;
+  align-items: center;
+  opacity: 0.5;
+}
+
+.cooldownText {
+  font-size: 0.65rem;
+  color: rgba(255,255,255,0.5);
+  text-align: center;
+}
+
+.cooldownTimer {
+  font-size: 0.9rem;
+  color: rgba(255,255,255,0.7);
+  text-align: center;
+  font-weight: 600;
 }

@@ -11,6 +11,7 @@ import { getItem } from '../data/mergeTree';
 import Cell from './Cell';
 import useGameStore from '../store/useGameStore';
 import { GRID_SIZE, parseKey } from '../utils/gridHelpers';
+import { sfxPickup, sfxMerge, sfxDrop } from '../utils/sound';
 import styles from './Grid.module.css';
 
 const Grid = () => {
@@ -34,6 +35,7 @@ const Grid = () => {
     const [r, c] = parseKey(cellKey);
     setDraggingItem({ ...grid[r][c], cellKey });
     setMergedKey(null);
+    sfxPickup();
   }, [grid]);
 
   const handleDragOver = useCallback(({ over }) => {
@@ -65,13 +67,16 @@ const Grid = () => {
       if (fromItem.level === toItem.level) {
         const merged = mergeItems(fromR, fromC, toR, toC);
         if (merged) {
+          sfxMerge();
           setMergedKey(`${toR}-${toC}`);
           setTimeout(() => setMergedKey(null), 600);
         }
       } else {
+        sfxDrop();
         swapItems(fromR, fromC, toR, toC);
       }
     } else {
+      sfxDrop();
       moveItem(fromR, fromC, toR, toC);
     }
   }, [grid, mergeItems, swapItems, moveItem]);

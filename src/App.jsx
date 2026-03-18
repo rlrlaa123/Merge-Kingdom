@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import TopBar from './components/TopBar';
+import { unlockAudio } from './utils/sound';
 import Grid from './components/Grid';
 import BottomBar from './components/BottomBar';
 import CollectionModal from './components/CollectionModal';
@@ -17,6 +18,16 @@ function Game() {
 
   useAutoIncome();
   useAutoSave();
+
+  useEffect(() => {
+    const unlock = () => unlockAudio();
+    document.addEventListener('touchstart', unlock, { once: true });
+    document.addEventListener('click', unlock, { once: true });
+    return () => {
+      document.removeEventListener('touchstart', unlock);
+      document.removeEventListener('click', unlock);
+    };
+  }, []);
 
   return (
     <div className="app">

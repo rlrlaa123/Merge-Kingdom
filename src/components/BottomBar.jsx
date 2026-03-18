@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import useGameStore from '../store/useGameStore';
 import { formatNumber } from '../utils/formatNumber';
 import { findEmptyCells } from '../utils/gridHelpers';
+import { sfxSpawn, sfxFail } from '../utils/sound';
 import styles from './BottomBar.module.css';
 
 const BottomBar = () => {
@@ -19,7 +20,7 @@ const BottomBar = () => {
 
   const handleSpawn = () => {
     const ok = spawnItem();
-    if (!ok) setShakeKey(k => k + 1);
+    if (ok) { sfxSpawn(); } else { sfxFail(); setShakeKey(k => k + 1); }
   };
 
   const label = !hasSpace ? '🔒 그리드 꽉 참' : `🥚 소환`;

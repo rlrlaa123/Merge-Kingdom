@@ -148,15 +148,24 @@ export const generateOrder = (
   };
 };
 
+// Hard 주문은 Kingdom Lv.3부터
+const gateDifficulty = (diff: Difficulty, kingdomLevel: number): Difficulty => {
+  if (diff === 'hard' && kingdomLevel < 3) return 'medium';
+  return diff;
+};
+
 // 초기 4개 주문 생성
 export const generateInitialOrders = (kingdomLevel: number, unlockedChains: string[]): Order[] => {
   const orders: Order[] = [];
   let lastCharId: string | undefined;
 
   for (const diff of SLOT_DIFFICULTIES) {
-    const order = generateOrder(diff, kingdomLevel, unlockedChains, lastCharId);
+    const gated = gateDifficulty(diff, kingdomLevel);
+    const order = generateOrder(gated, kingdomLevel, unlockedChains, lastCharId);
     orders.push(order);
     lastCharId = order.characterId;
   }
   return orders;
 };
+
+export { gateDifficulty };

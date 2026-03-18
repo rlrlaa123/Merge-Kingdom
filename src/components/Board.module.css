@@ -2,11 +2,11 @@
   display: grid;
   gap: 5px;
   padding: 8px;
-  width: 100%;
-  max-width: 95vw;
-  margin: 0 auto;
+  width: min(100%, 95vw);
+  aspect-ratio: 1;
+  max-height: 100%;
+  margin: auto;
   touch-action: none;
-  flex: 1;
 }
 
 .overlay {

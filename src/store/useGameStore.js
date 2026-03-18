@@ -107,7 +107,7 @@ const useGameStore = create((set, get) => ({
     const toItem = grid[toR][toC];
     if (!fromItem || !toItem) return false;
     if (fromItem.level !== toItem.level) return false;
-    if (fromItem.tree !== toItem.tree) return false; // 같은 트리만 머지
+    if ((fromItem.tree || 'animal') !== (toItem.tree || 'animal')) return false; // 같은 트리만 머지
     if (fromItem.level >= MAX_LEVEL) return false;
     const tree = fromItem.tree || 'animal';
     const newLevel = fromItem.level + 1;

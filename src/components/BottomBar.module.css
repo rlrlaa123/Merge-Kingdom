@@ -20,6 +20,7 @@
   align-items: center;
   gap: 2px;
   padding: 6px 12px;
+  position: relative;
   background: rgba(255,255,255,0.06);
   border: 1.5px solid rgba(255,255,255,0.15);
   border-radius: 10px;
@@ -41,7 +42,20 @@
 
 .treeCost {
   font-size: 0.55rem;
+  color: #ff6666;
+}
+
+.treeCost.affordable {
   color: #ffd700;
+}
+
+.activeDot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #667eea;
+  position: absolute;
+  bottom: 3px;
 }
 
 .spawnBtn {

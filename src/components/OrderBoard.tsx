@@ -26,9 +26,16 @@ const OrderBoard = () => {
       }
     }
 
+  // 납품 가능한 주문을 앞으로 정렬
+  const sortedOrders = [...orders].sort((a, b) => {
+    const aReady = canDeliver(a.id) ? 0 : 1;
+    const bReady = canDeliver(b.id) ? 0 : 1;
+    return aReady - bReady;
+  });
+
   return (
     <div className={styles.board}>
-      {orders.map(order => {
+      {sortedOrders.map(order => {
         const deliverable = canDeliver(order.id);
         const diffClass = DIFF_CLASS[order.difficulty] || '';
         return (

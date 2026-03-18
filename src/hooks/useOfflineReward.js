@@ -5,7 +5,6 @@ export const useOfflineReward = () => {
   const [reward, setReward] = useState(null);
   const load = useGameStore(s => s.load);
   const calcOfflineReward = useGameStore(s => s.calcOfflineReward);
-  const addCoins = useGameStore(s => s.coins);
 
   useEffect(() => {
     const data = load();

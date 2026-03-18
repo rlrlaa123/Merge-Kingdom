@@ -6,7 +6,7 @@ import {
   useSensors,
   DragOverlay,
 } from '@dnd-kit/core';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { getItem } from '../data/mergeTree';
 import Cell from './Cell';
 import useGameStore from '../store/useGameStore';
@@ -23,8 +23,10 @@ const Grid = () => {
   const [mergeTargetKey, setMergeTargetKey] = useState(null);
   const [mergedKey, setMergedKey] = useState(null);
 
-  const mouseSensor = useSensor(MouseSensor, { activationConstraint: { distance: 5 } });
-  const touchSensor = useSensor(TouchSensor, { activationConstraint: { delay: 0, tolerance: 5 } });
+  const mouseOptions = useMemo(() => ({ activationConstraint: { distance: 5 } }), []);
+  const touchOptions = useMemo(() => ({ activationConstraint: { delay: 0, tolerance: 5 } }), []);
+  const mouseSensor = useSensor(MouseSensor, mouseOptions);
+  const touchSensor = useSensor(TouchSensor, touchOptions);
   const sensors = useSensors(mouseSensor, touchSensor);
 
   const handleDragStart = useCallback(({ active }) => {

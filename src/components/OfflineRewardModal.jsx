@@ -1,4 +1,3 @@
-import { motion, AnimatePresence } from 'framer-motion';
 import { formatNumber } from '../utils/formatNumber';
 import styles from './OfflineRewardModal.module.css';
 
@@ -9,28 +8,22 @@ const formatTime = (seconds) => {
   return `${m}분`;
 };
 
-const OfflineRewardModal = ({ reward, onClose }) => (
-  <AnimatePresence>
-    {reward && (
-      <motion.div className={styles.overlay} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-        <motion.div
-          className={styles.modal}
-          initial={{ scale: 0.7, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          exit={{ scale: 0.7, opacity: 0 }}
-          transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-        >
-          <div className={styles.icon}>🎁</div>
-          <h2 className={styles.title}>오프라인 보상!</h2>
-          <p className={styles.desc}>{formatTime(reward.elapsed)} 동안 열심히 일했어요</p>
-          <div className={styles.reward}>
-            <span>🪙 +{formatNumber(reward.income)}</span>
-          </div>
-          <button className={styles.btn} onClick={onClose}>받기!</button>
-        </motion.div>
-      </motion.div>
-    )}
-  </AnimatePresence>
-);
+const OfflineRewardModal = ({ reward, onClose }) => {
+  if (!reward) return null;
+
+  return (
+    <div className={styles.overlay}>
+      <div className={styles.modal}>
+        <div className={styles.icon}>🎁</div>
+        <h2 className={styles.title}>오프라인 보상!</h2>
+        <p className={styles.desc}>{formatTime(reward.elapsed)} 동안 열심히 일했어요</p>
+        <div className={styles.reward}>
+          <span>🪙 +{formatNumber(reward.income)}</span>
+        </div>
+        <button className={styles.btn} onClick={onClose}>받기!</button>
+      </div>
+    </div>
+  );
+};
 
 export default OfflineRewardModal;

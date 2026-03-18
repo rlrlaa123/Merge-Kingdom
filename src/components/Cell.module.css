@@ -39,7 +39,6 @@
   position: absolute;
   top: 0;
   left: 50%;
-  transform: translateX(-50%);
   font-size: 0.85rem;
   font-weight: 800;
   color: #ffd700;
@@ -47,4 +46,10 @@
   white-space: nowrap;
   pointer-events: none;
   z-index: 50;
+  animation: floatUp 1.0s ease-out forwards;
+}
+
+@keyframes floatUp {
+  0%   { transform: translateX(-50%) translateY(0); opacity: 1; }
+  100% { transform: translateX(-50%) translateY(-44px); opacity: 0; }
 }

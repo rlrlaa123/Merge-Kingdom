@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { motion } from 'framer-motion';
 import useGameStore from '../store/useGameStore';
 import { formatNumber } from '../utils/formatNumber';
 import { findEmptyCells } from '../utils/gridHelpers';
@@ -16,29 +15,31 @@ const BottomBar = () => {
   const hasSpace = findEmptyCells(grid).length > 0;
   const canSpawn = canAfford && hasSpace;
 
-  const [shakeKey, setShakeKey] = useState(0);
+  const [shake, setShake] = useState(false);
 
   const handleSpawn = () => {
     const ok = spawnItem();
-    if (ok) { sfxSpawn(); } else { sfxFail(); setShakeKey(k => k + 1); }
+    if (ok) {
+      sfxSpawn();
+    } else {
+      sfxFail();
+      setShake(true);
+      setTimeout(() => setShake(false), 300);
+    }
   };
 
-  const label = !hasSpace ? '🔒 그리드 꽉 참' : `🥚 소환`;
+  const label = !hasSpace ? '🔒 그리드 꽉 참' : '🥚 소환';
   const sublabel = !hasSpace ? '머지해서 공간 확보!' : `${formatNumber(cost)} 🪙`;
 
   return (
     <div className={styles.bottomBar}>
-      <motion.button
-        key={shakeKey}
-        className={`${styles.spawnBtn} ${!canSpawn ? styles.disabled : ''}`}
+      <button
+        className={`${styles.spawnBtn} ${!canSpawn ? styles.disabled : ''} ${shake ? styles.shake : ''}`}
         onClick={handleSpawn}
-        whileTap={canSpawn ? { scale: 0.95 } : {}}
-        animate={shakeKey > 0 ? { x: [-6, 6, -4, 4, 0] } : {}}
-        transition={{ duration: 0.3 }}
       >
         <span>{label}</span>
         <span className={styles.cost}>{sublabel}</span>
-      </motion.button>
+      </button>
     </div>
   );
 };

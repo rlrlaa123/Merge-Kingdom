@@ -24,6 +24,7 @@ const Grid = () => {
   const [draggingItem, setDraggingItem] = useState(null);
   const [mergeTargetKey, setMergeTargetKey] = useState(null);
   const [mergedKey, setMergedKey] = useState(null);
+  const [comboFlash, setComboFlash] = useState(false);
 
   const mouseOptions = useMemo(() => ({ activationConstraint: { distance: 5 } }), []);
   const touchOptions = useMemo(() => ({ activationConstraint: { delay: 0, tolerance: 5 } }), []);
@@ -71,11 +72,16 @@ const Grid = () => {
 
     if (toItem) {
       if (fromItem.level === toItem.level && (fromItem.tree || 'animal') === (toItem.tree || 'animal')) {
-        const merged = mergeItems(fromR, fromC, toR, toC);
-        if (merged) {
+        const combo = mergeItems(fromR, fromC, toR, toC);
+        if (combo) {
           sfxMerge();
           setMergedKey(`${toR}-${toC}`);
           setTimeout(() => setMergedKey(null), 600);
+          // FEVER 이펙트 (콤보 4+)
+          if (combo >= 4) {
+            setComboFlash(true);
+            setTimeout(() => setComboFlash(false), 500);
+          }
         }
       } else {
         sfxDrop();
@@ -94,7 +100,7 @@ const Grid = () => {
 
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
-      <div className={styles.grid} style={gridStyle}>
+      <div className={`${styles.grid} ${comboFlash ? styles.feverFlash : ''}`} style={gridStyle}>
         {Array.from({ length: gridSize }, (_, r) =>
           Array.from({ length: gridSize }, (_, c) => (
             <Cell

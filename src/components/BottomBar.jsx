@@ -6,8 +6,15 @@ import { findEmptyCells } from '../utils/gridHelpers';
 import { sfxSpawn, sfxFail, sfxMerge } from '../utils/sound';
 import styles from './BottomBar.module.css';
 
+const formatTime = (sec) => {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return m > 0 ? `${m}:${String(s).padStart(2, '0')}` : `${s}초`;
+};
+
 const BottomBar = () => {
   const spawnItem = useGameStore(s => s.spawnItem);
+  const freeSpawn = useGameStore(s => s.freeSpawn);
   const coins = useGameStore(s => s.coins);
   const grid = useGameStore(s => s.grid);
   const gridSize = useGameStore(s => s.gridSize);
@@ -19,21 +26,36 @@ const BottomBar = () => {
   const expandGrid = useGameStore(s => s.expandGrid);
   const getExpandCost = useGameStore(s => s.getExpandCost);
   const addFloatingText = useGameStore(s => s.addFloatingText);
+  const freeSpawnCharges = useGameStore(s => s.freeSpawnCharges);
+  const maxFreeSpawnCharges = useGameStore(s => s.maxFreeSpawnCharges);
+  const getFreeSpawnCooldownRemaining = useGameStore(s => s.getFreeSpawnCooldownRemaining);
+  const activateBoost = useGameStore(s => s.activateBoost);
+  const getBoostTimeRemaining = useGameStore(s => s.getBoostTimeRemaining);
 
   const cost = getSpawnCost();
   const canAfford = coins >= cost;
   const hasSpace = findEmptyCells(grid, gridSize).length > 0;
   const canSpawn = canAfford && hasSpace;
   const expandCost = getExpandCost();
+  const freeRemaining = getFreeSpawnCooldownRemaining();
+  const boostInfo = getBoostTimeRemaining();
+
+  const activeTreeLv1 = getTreeItem(activeTree, 1).emoji;
 
   const [shake, setShake] = useState(false);
 
-  // 현재 선택된 트리의 Lv.1 이모지
-  const activeTreeLv1 = getTreeItem(activeTree, 1).emoji;
-
   const handleSpawn = () => {
     const ok = spawnItem();
-    if (ok) { sfxSpawn(); } else { sfxFail(); setShake(true); setTimeout(() => setShake(false), 300); }
+    if (ok) sfxSpawn();
+    else { sfxFail(); setShake(true); setTimeout(() => setShake(false), 300); }
+  };
+
+  const handleFreeSpawn = () => {
+    if (freeSpawnCharges <= 0) { sfxFail(); return; }
+    if (!hasSpace) { sfxFail(); return; }
+    const ok = freeSpawn();
+    if (ok) sfxSpawn();
+    else sfxFail();
   };
 
   const handleTreeSelect = (treeId) => {
@@ -42,13 +64,11 @@ const BottomBar = () => {
     } else {
       const treeDef = TREES.find(t => t.id === treeId);
       if (treeDef && coins < treeDef.unlockCost) {
-        // 코인 부족 피드백
         sfxFail();
         addFloatingText(`${formatNumber(treeDef.unlockCost)} 🪙 필요!`, 2, 2);
       } else {
         const ok = unlockTree(treeId);
-        if (ok) sfxMerge();
-        else sfxFail();
+        if (ok) sfxMerge(); else sfxFail();
       }
     }
   };
@@ -60,16 +80,17 @@ const BottomBar = () => {
       return;
     }
     const ok = expandGrid();
-    if (ok) sfxMerge();
-    else sfxFail();
+    if (ok) sfxMerge(); else sfxFail();
   };
 
-  const label = !hasSpace ? '🔒 꽉 참' : `${activeTreeLv1} 소환`;
-  const sublabel = !hasSpace ? '머지하세요!' : `${formatNumber(cost)} 🪙`;
+  const handleBoost = () => {
+    const ok = activateBoost();
+    if (ok) sfxMerge(); else sfxFail();
+  };
 
   return (
     <div className={styles.bottomBar}>
-      {/* 트리 선택 */}
+      {/* 트리 + 확장 + 부스트 */}
       <div className={styles.treeRow}>
         {TREES.map(tree => {
           const unlocked = unlockedTrees.includes(tree.id);
@@ -80,7 +101,6 @@ const BottomBar = () => {
               key={tree.id}
               className={`${styles.treeBtn} ${active ? styles.active : ''} ${!unlocked ? styles.locked : ''}`}
               onClick={() => handleTreeSelect(tree.id)}
-              title={unlocked ? tree.name : `${tree.name} (${formatNumber(tree.unlockCost)} 🪙)`}
             >
               <span>{tree.icon}</span>
               {!unlocked && (
@@ -92,13 +112,10 @@ const BottomBar = () => {
             </button>
           );
         })}
-
-        {/* 그리드 확장 */}
         {expandCost && (
           <button
             className={`${styles.treeBtn} ${coins < expandCost ? styles.locked : ''}`}
             onClick={handleExpand}
-            title={`그리드 확장 (${formatNumber(expandCost)} 🪙)`}
           >
             <span>🔲</span>
             <span className={`${styles.treeCost} ${coins >= expandCost ? styles.affordable : ''}`}>
@@ -106,16 +123,41 @@ const BottomBar = () => {
             </span>
           </button>
         )}
+
+        {/* 부스트 버튼 */}
+        <button
+          className={`${styles.treeBtn} ${boostInfo.type === 'active' ? styles.boostActive : ''} ${boostInfo.type === 'cooldown' ? styles.locked : ''}`}
+          onClick={handleBoost}
+          disabled={boostInfo.type !== 'ready'}
+        >
+          <span>⚡</span>
+          {boostInfo.type === 'ready' && <span className={styles.treeCost + ' ' + styles.affordable}>×2</span>}
+          {boostInfo.type === 'active' && <span className={styles.treeCost + ' ' + styles.affordable}>{formatTime(boostInfo.remaining)}</span>}
+          {boostInfo.type === 'cooldown' && <span className={styles.treeCost}>{formatTime(boostInfo.remaining)}</span>}
+        </button>
       </div>
 
       {/* 소환 버튼 */}
-      <button
-        className={`${styles.spawnBtn} ${!canSpawn ? styles.disabled : ''} ${shake ? styles.shake : ''}`}
-        onClick={handleSpawn}
-      >
-        <span>{label}</span>
-        <span className={styles.cost}>{sublabel}</span>
-      </button>
+      <div className={styles.spawnRow}>
+        <button
+          className={`${styles.spawnBtn} ${!canSpawn ? styles.disabled : ''} ${shake ? styles.shake : ''}`}
+          onClick={handleSpawn}
+        >
+          <span>{!hasSpace ? '🔒 꽉 참' : `${activeTreeLv1} 소환`}</span>
+          <span className={styles.cost}>{!hasSpace ? '머지하세요!' : `${formatNumber(cost)} 🪙`}</span>
+        </button>
+
+        {/* 무료 소환 */}
+        <button
+          className={`${styles.freeBtn} ${freeSpawnCharges <= 0 || !hasSpace ? styles.disabled : ''}`}
+          onClick={handleFreeSpawn}
+        >
+          <span>🆓</span>
+          <span className={styles.freeCharges}>
+            {freeSpawnCharges > 0 ? `${freeSpawnCharges}/${maxFreeSpawnCharges}` : formatTime(freeRemaining)}
+          </span>
+        </button>
+      </div>
     </div>
   );
 };

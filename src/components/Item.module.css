@@ -57,3 +57,18 @@
   color: rgba(255,255,255,0.6);
   font-weight: 600;
 }
+
+.harvestCoin {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  font-size: 0.75rem;
+  animation: harvestBounce 1s ease-in-out infinite;
+  filter: drop-shadow(0 1px 3px rgba(0,0,0,0.6));
+  pointer-events: none;
+}
+
+@keyframes harvestBounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}

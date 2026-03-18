@@ -1,7 +1,8 @@
-import { memo, useMemo } from 'react';
+import { memo, useMemo, useCallback } from 'react';
 import { useDroppable, useDraggable } from '@dnd-kit/core';
 import Item from './Item';
 import FloatingTextsOverlay from './FloatingTextsOverlay';
+import useGameStore from '../store/useGameStore';
 import { cellKey } from '../utils/gridHelpers';
 import styles from './Cell.module.css';
 
@@ -18,6 +19,10 @@ const Cell = memo(({ r, c, item, isMergeTarget, isMergedCell }) => {
     disabled: !item,
   });
 
+  const isHarvestReady = useGameStore(s => item ? s.isHarvestReady(item.id) : false);
+  const harvestItem = useGameStore(s => s.harvestItem);
+  const handleHarvest = useCallback(() => harvestItem(r, c), [harvestItem, r, c]);
+
   return (
     <div
       ref={setDropRef}
@@ -31,6 +36,8 @@ const Cell = memo(({ r, c, item, isMergeTarget, isMergedCell }) => {
           tree={item.tree}
           isMerged={isMergedCell}
           isDragging={isDragging}
+          isHarvestReady={isHarvestReady}
+          onHarvest={handleHarvest}
           dragRef={setDragRef}
           dragListeners={listeners}
           dragAttributes={attributes}

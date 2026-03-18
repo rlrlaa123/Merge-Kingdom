@@ -1,15 +1,11 @@
-import { memo, useRef, useMemo } from 'react';
-import { useDroppable } from '@dnd-kit/core';
-import { useDraggable } from '@dnd-kit/core';
+import { memo, useMemo } from 'react';
+import { useDroppable, useDraggable } from '@dnd-kit/core';
 import Item from './Item';
 import FloatingTextsOverlay from './FloatingTextsOverlay';
 import { cellKey } from '../utils/gridHelpers';
 import styles from './Cell.module.css';
 
 const Cell = memo(({ r, c, item, isMergeTarget, isMergedCell }) => {
-  const renderCount = useRef(0);
-  renderCount.current += 1;
-
   const key = cellKey(r, c);
   const { setNodeRef: setDropRef, isOver } = useDroppable({ id: `cell-${key}`, data: { r, c } });
 
@@ -21,11 +17,6 @@ const Cell = memo(({ r, c, item, isMergeTarget, isMergedCell }) => {
     data: draggableData,
     disabled: !item,
   });
-
-  // Cell 렌더 추적
-  if (item) {
-    console.log(`[Cell] ${key} itemId=${item.id} isDragging=${isDragging} render=#${renderCount.current}`);
-  }
 
   return (
     <div
@@ -44,7 +35,6 @@ const Cell = memo(({ r, c, item, isMergeTarget, isMergedCell }) => {
           dragAttributes={attributes}
         />
       )}
-
       <FloatingTextsOverlay r={r} c={c} />
     </div>
   );

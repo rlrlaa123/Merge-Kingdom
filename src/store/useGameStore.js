@@ -1,173 +1,136 @@
 import { create } from 'zustand';
 import { getRandomEmptyCell, cloneGrid } from '../utils/gridHelpers';
 import { createEmptyGrid, findEmptyCells, GRID_SIZE as DEFAULT_GRID_SIZE } from '../utils/gridHelpers';
-import { getItem, getTreeItem, MAX_LEVEL, TREES } from '../data/mergeTree';
+import { getTreeItem, MAX_LEVEL, KINGDOM_LEVELS, getKingdomLevel, getNextKingdomLevel } from '../data/mergeTree';
 import { QUESTS } from '../data/quests';
+import { generateOrder } from '../data/orders';
 
-const newItem = (level, tree = 'animal') => ({
+const newItem = (level, tree = 'animal', special = null) => ({
   id: Date.now().toString(36) + Math.random().toString(36).substr(2),
-  level,
-  tree,
+  level, tree, special,
 });
 
 const FRESH_DURATION = 600;
 const SAVE_KEY = 'merge-kingdom-save';
+const calcSpawnCost = (n) => Math.floor(10 * Math.pow(1.08, n));
 
-// Phase 5: 구간별 소환 비용 (초반 완만, 후반 가파름)
-const calcSpawnCost = (n) => {
-  if (n < 20) return Math.floor(10 * Math.pow(1.08, n));
-  if (n < 50) return Math.floor(10 * Math.pow(1.08, 20) * Math.pow(1.12, n - 20));
-  return Math.floor(10 * Math.pow(1.08, 20) * Math.pow(1.12, 30) * Math.pow(1.18, n - 50));
-};
+// 콤보
+const getComboMultiplier = (c) => c >= 4 ? 2.5 : c >= 3 ? 2.0 : c >= 2 ? 1.5 : 1;
+const getComboLabel = (c) => c >= 4 ? 'FEVER!' : c >= 2 ? `콤보 ×${c}!` : '';
 
-// Phase 5: 콤보 배율
-const getComboMultiplier = (combo) => {
-  if (combo >= 4) return 2.5;
-  if (combo >= 3) return 2.0;
-  if (combo >= 2) return 1.5;
-  return 1;
-};
+// 수확 쿨다운
+const getHarvestCooldown = (level) => Math.max(5, 11 - level) * 1000;
+const HARVEST_EXPIRE = 30_000;
 
-const getComboLabel = (combo) => {
-  if (combo >= 4) return 'FEVER!';
-  if (combo >= 2) return `콤보 ×${combo}!`;
-  return '';
-};
-
-// --- 퀘스트 진행도 체크 ---
+// 퀘스트
 const checkQuestProgress = (stats, discovered) => {
   const progress = {};
   for (const q of QUESTS) {
     switch (q.type) {
-      case 'merge':       progress[q.id] = Math.min(stats.totalMerges, q.target); break;
-      case 'spawn':       progress[q.id] = Math.min(stats.totalSpawns, q.target); break;
+      case 'merge': progress[q.id] = Math.min(stats.totalMerges, q.target); break;
+      case 'spawn': progress[q.id] = Math.min(stats.totalSpawns, q.target); break;
       case 'reach_level': progress[q.id] = stats.maxLevel >= q.target ? q.target : 0; break;
-      case 'earn_coins':  progress[q.id] = Math.min(Math.floor(stats.totalCoinsEarned), q.target); break;
+      case 'earn_coins': progress[q.id] = Math.min(Math.floor(stats.totalCoinsEarned), q.target); break;
       case 'collect': {
-        const uniqueLevels = new Set([...discovered].map(k => {
-          const parts = k.toString().split('-');
-          return parts.length === 2 ? parseInt(parts[1]) : parseInt(k);
-        }));
-        progress[q.id] = Math.min(uniqueLevels.size, q.target);
-        break;
+        const uq = new Set([...discovered].map(k => { const p = k.toString().split('-'); return p.length === 2 ? parseInt(p[1]) : parseInt(k); }));
+        progress[q.id] = Math.min(uq.size, q.target); break;
       }
     }
   }
   return progress;
 };
 
-// 수확 쿨다운 (레벨별 차등: Lv1=10초, Lv7=5초)
-const getHarvestCooldown = (level) => Math.max(5, 11 - level) * 1000;
-const HARVEST_EXPIRE = 30_000; // 30초 미수확 시 소멸
+// 프레스티지 버프 정의
+const PRESTIGE_BUFFS = {
+  startCoins:    { cost: 1, desc: '시작 코인 ×5',       apply: (s) => ({ startCoins: 500 }) },
+  spawnDiscount: { cost: 2, desc: '소환 비용 -15%',     apply: () => ({}) },
+  autoIncome:    { cost: 2, desc: '자동수익 ×1.3',      apply: () => ({}) },
+  orderReward:   { cost: 3, desc: '주문 보상 ×1.5',     apply: () => ({}) },
+  goldenChance:  { cost: 3, desc: '골드 알 확률 10%',   apply: () => ({}) },
+};
 
 const useGameStore = create((set, get) => ({
-  // --- 그리드 ---
-  grid: createEmptyGrid(),
-  gridSize: DEFAULT_GRID_SIZE,
-
-  // --- 경제 ---
-  coins: 100,
-  totalSpawns: 0,
-
-  // --- 도감 & 트리 ---
+  grid: createEmptyGrid(), gridSize: DEFAULT_GRID_SIZE,
+  coins: 100, totalSpawns: 0,
   discovered: new Set(['animal-1']),
-  activeTree: 'animal',
-  unlockedTrees: ['animal'],
-
-  // --- 통계 ---
+  activeTree: 'animal', unlockedTrees: ['animal'],
   stats: { totalMerges: 0, totalSpawns: 0, maxLevel: 1, totalCoinsEarned: 0 },
+  questProgress: {}, claimedQuests: [],
 
-  // --- 퀘스트 ---
-  questProgress: {},
-  claimedQuests: [],
+  // 무료 소환
+  freeSpawnCharges: 3, maxFreeSpawnCharges: 3, freeSpawnCooldown: 30, lastFreeSpawnTick: Date.now(),
 
-  // --- Phase 5: 무료 소환 ---
-  freeSpawnCharges: 3,
-  maxFreeSpawnCharges: 3,
-  freeSpawnCooldown: 30, // 초
-  lastFreeSpawnTick: Date.now(),
+  // 콤보
+  comboCount: 0, lastMergeTime: 0,
 
-  // --- Phase 5: 콤보 ---
-  comboCount: 0,
-  lastMergeTime: 0,
+  // 수확
+  harvestTimers: {},
 
-  // --- Phase 5: 수확 ---
-  harvestTimers: {}, // { itemId: { readyAt, expiresAt } }
+  // 부스트
+  boostActive: false, boostEndTime: null, boostCooldownEnd: null,
 
-  // --- Phase 5: 부스트 ---
-  boostActive: false,
-  boostEndTime: null,
-  boostCooldownEnd: null,
+  // 주문
+  orders: [], maxOrders: 3, nextOrderAt: Date.now() + 10_000, totalDeliveries: 0,
 
-  // --- 타이머 ---
-  lastTick: Date.now(),
-  lastSaved: Date.now(),
+  // 명성 & 왕국
+  fame: 0, kingdomLevel: 1, levelUpUnlock: null, // 레벨업 알림용
 
-  // --- UI ---
-  floatingTexts: [],
-  freshItemIds: new Set(),
+  // 프레스티지
+  crownPoints: 0, totalPrestiges: 0, permanentBuffs: [],
 
-  // === 내부 헬퍼 ===
+  // UI
+  lastTick: Date.now(), lastSaved: Date.now(),
+  floatingTexts: [], freshItemIds: new Set(),
+
+  // === 헬퍼 ===
   _markFresh: (id) => {
-    set(state => ({ freshItemIds: new Set([...state.freshItemIds, id]) }));
-    setTimeout(() => {
-      set(state => {
-        const next = new Set(state.freshItemIds);
-        next.delete(id);
-        return { freshItemIds: next };
-      });
-    }, FRESH_DURATION);
+    set(s => ({ freshItemIds: new Set([...s.freshItemIds, id]) }));
+    setTimeout(() => set(s => { const n = new Set(s.freshItemIds); n.delete(id); return { freshItemIds: n }; }), FRESH_DURATION);
   },
-
-  _updateQuestProgress: () => {
-    const { stats, discovered } = get();
-    set({ questProgress: checkQuestProgress(stats, discovered) });
+  _updateQuestProgress: () => { const { stats, discovered } = get(); set({ questProgress: checkQuestProgress(stats, discovered) }); },
+  _startHarvestTimer: (itemId, level) => {
+    const cd = getHarvestCooldown(level);
+    set(s => ({ harvestTimers: { ...s.harvestTimers, [itemId]: { readyAt: Date.now() + cd, expiresAt: Date.now() + cd + HARVEST_EXPIRE } } }));
   },
-
   getBoostMultiplier: () => get().boostActive ? 2 : 1,
+  _hasBuffs: (buffId) => get().permanentBuffs.includes(buffId),
+  _getGoldenChance: () => {
+    const { kingdomLevel, permanentBuffs } = get();
+    if (kingdomLevel < 4) return 0;
+    return permanentBuffs.includes('goldenChance') ? 0.10 : 0.05;
+  },
 
-  // === 소환 (코인) ===
+  // === 소환 ===
   spawnItem: () => {
-    const { grid, coins, totalSpawns, activeTree, gridSize } = get();
-    const cost = calcSpawnCost(totalSpawns);
+    const { grid, coins, totalSpawns, activeTree, gridSize, permanentBuffs } = get();
+    let cost = calcSpawnCost(totalSpawns);
+    if (permanentBuffs.includes('spawnDiscount')) cost = Math.floor(cost * 0.85);
     if (coins < cost) return false;
     const cell = getRandomEmptyCell(grid, gridSize);
     if (!cell) return false;
-    const item = newItem(1, activeTree);
+    const special = Math.random() < get()._getGoldenChance() ? 'golden' : null;
+    const item = newItem(1, activeTree, special);
     const newGrid = cloneGrid(grid);
     newGrid[cell.r][cell.c] = item;
-    const newDiscovered = new Set(get().discovered);
-    newDiscovered.add(`${activeTree}-1`);
-    set(state => ({
-      grid: newGrid,
-      coins: coins - cost,
-      totalSpawns: totalSpawns + 1,
-      discovered: newDiscovered,
-      stats: { ...state.stats, totalSpawns: state.stats.totalSpawns + 1 },
-    }));
+    const disc = new Set(get().discovered); disc.add(`${activeTree}-1`);
+    set(s => ({ grid: newGrid, coins: coins - cost, totalSpawns: totalSpawns + 1, discovered: disc, stats: { ...s.stats, totalSpawns: s.stats.totalSpawns + 1 } }));
     get()._startHarvestTimer(item.id, 1);
     get()._markFresh(item.id);
     get()._updateQuestProgress();
     return true;
   },
 
-  // === Phase 5: 무료 소환 ===
   freeSpawn: () => {
     const { grid, freeSpawnCharges, activeTree, gridSize } = get();
     if (freeSpawnCharges <= 0) return false;
     const cell = getRandomEmptyCell(grid, gridSize);
     if (!cell) return false;
-    const item = newItem(1, activeTree);
+    const special = Math.random() < get()._getGoldenChance() ? 'golden' : null;
+    const item = newItem(1, activeTree, special);
     const newGrid = cloneGrid(grid);
     newGrid[cell.r][cell.c] = item;
-    const newDiscovered = new Set(get().discovered);
-    newDiscovered.add(`${activeTree}-1`);
-    set(state => ({
-      grid: newGrid,
-      freeSpawnCharges: state.freeSpawnCharges - 1,
-      discovered: newDiscovered,
-      stats: { ...state.stats, totalSpawns: state.stats.totalSpawns + 1 },
-    }));
+    const disc = new Set(get().discovered); disc.add(`${activeTree}-1`);
+    set(s => ({ grid: newGrid, freeSpawnCharges: s.freeSpawnCharges - 1, discovered: disc, stats: { ...s.stats, totalSpawns: s.stats.totalSpawns + 1 } }));
     get()._startHarvestTimer(item.id, 1);
     get()._markFresh(item.id);
     get()._updateQuestProgress();
@@ -176,212 +139,269 @@ const useGameStore = create((set, get) => ({
 
   tickFreeSpawn: () => {
     const { freeSpawnCharges, maxFreeSpawnCharges, freeSpawnCooldown, lastFreeSpawnTick } = get();
-    if (freeSpawnCharges >= maxFreeSpawnCharges) {
-      set({ lastFreeSpawnTick: Date.now() });
-      return;
-    }
-    const now = Date.now();
-    const elapsed = (now - lastFreeSpawnTick) / 1000;
-    const newCharges = Math.floor(elapsed / freeSpawnCooldown);
-    if (newCharges > 0) {
-      const finalCharges = Math.min(freeSpawnCharges + newCharges, maxFreeSpawnCharges);
-      set({
-        freeSpawnCharges: finalCharges,
-        lastFreeSpawnTick: finalCharges >= maxFreeSpawnCharges ? now : lastFreeSpawnTick + newCharges * freeSpawnCooldown * 1000,
-      });
+    if (freeSpawnCharges >= maxFreeSpawnCharges) { set({ lastFreeSpawnTick: Date.now() }); return; }
+    const elapsed = (Date.now() - lastFreeSpawnTick) / 1000;
+    const nc = Math.floor(elapsed / freeSpawnCooldown);
+    if (nc > 0) {
+      const fc = Math.min(freeSpawnCharges + nc, maxFreeSpawnCharges);
+      set({ freeSpawnCharges: fc, lastFreeSpawnTick: fc >= maxFreeSpawnCharges ? Date.now() : lastFreeSpawnTick + nc * freeSpawnCooldown * 1000 });
     }
   },
-
   getFreeSpawnCooldownRemaining: () => {
     const { freeSpawnCharges, maxFreeSpawnCharges, freeSpawnCooldown, lastFreeSpawnTick } = get();
     if (freeSpawnCharges >= maxFreeSpawnCharges) return 0;
-    const elapsed = (Date.now() - lastFreeSpawnTick) / 1000;
-    const remaining = freeSpawnCooldown - (elapsed % freeSpawnCooldown);
-    return Math.ceil(remaining);
+    return Math.ceil(freeSpawnCooldown - ((Date.now() - lastFreeSpawnTick) / 1000) % freeSpawnCooldown);
   },
 
-  // === 머지 (Phase 5: 콤보 + 부스트) ===
+  // === 머지 (콤보 + 부스트 + 특수 아이템) ===
   mergeItems: (fromR, fromC, toR, toC) => {
     const { grid, discovered, lastMergeTime, comboCount } = get();
-    const fromItem = grid[fromR][fromC];
-    const toItem = grid[toR][toC];
-    if (!fromItem || !toItem) return false;
-    if (fromItem.level !== toItem.level) return false;
-    if ((fromItem.tree || 'animal') !== (toItem.tree || 'animal')) return false;
-    if (fromItem.level >= MAX_LEVEL) return false;
-    const tree = fromItem.tree || 'animal';
-    const newLevel = fromItem.level + 1;
+    const from = grid[fromR][fromC], to = grid[toR][toC];
+    if (!from || !to) return false;
+
+    // 와일드카드: 같은 트리면 레벨 무관 머지
+    const isWild = from.special === 'wildcard' || to.special === 'wildcard';
+    if (!isWild) {
+      if (from.level !== to.level) return false;
+    }
+    if ((from.tree || 'animal') !== (to.tree || 'animal')) return false;
+    const baseLevel = isWild ? Math.max(from.level, to.level) : from.level;
+    if (baseLevel >= MAX_LEVEL) return false;
+
+    const tree = from.tree || 'animal';
+    const isGolden = from.special === 'golden' || to.special === 'golden';
+    const newLevel = Math.min(baseLevel + (isGolden ? 2 : 1), MAX_LEVEL);
     const treeItem = getTreeItem(tree, newLevel);
 
-    // 콤보 계산
+    // 콤보
     const now = Date.now();
     const newCombo = (now - lastMergeTime < 5000) ? comboCount + 1 : 1;
-    const comboMult = getComboMultiplier(newCombo);
-    const boostMult = get().getBoostMultiplier();
+    const cMult = getComboMultiplier(newCombo);
+    const bMult = get().getBoostMultiplier();
+    const oMult = get().permanentBuffs.includes('orderReward') ? 1 : 1; // orderReward만 주문에 적용
     const baseBonus = treeItem.mergeBonus;
-    const finalBonus = Math.floor(baseBonus * comboMult * boostMult);
+    const finalBonus = Math.floor(baseBonus * cMult * bMult);
 
     const mergedItem = newItem(newLevel, tree);
     const newGrid = cloneGrid(grid);
     newGrid[fromR][fromC] = null;
     newGrid[toR][toC] = mergedItem;
-    const newDiscovered = new Set(discovered);
-    newDiscovered.add(`${tree}-${newLevel}`);
+    const disc = new Set(discovered); disc.add(`${tree}-${newLevel}`);
+    const ht = { ...get().harvestTimers }; delete ht[from.id]; delete ht[to.id];
 
-    // 수확 타이머 정리 (머지된 아이템 제거, 새 아이템 시작)
-    const newTimers = { ...get().harvestTimers };
-    delete newTimers[fromItem.id];
-    delete newTimers[toItem.id];
-
-    set(state => ({
-      grid: newGrid,
-      coins: state.coins + finalBonus,
-      discovered: newDiscovered,
-      comboCount: newCombo,
-      lastMergeTime: now,
-      harvestTimers: newTimers,
-      stats: {
-        ...state.stats,
-        totalMerges: state.stats.totalMerges + 1,
-        maxLevel: Math.max(state.stats.maxLevel, newLevel),
-        totalCoinsEarned: state.stats.totalCoinsEarned + finalBonus,
-      },
+    set(s => ({
+      grid: newGrid, coins: s.coins + finalBonus, discovered: disc,
+      comboCount: newCombo, lastMergeTime: now, harvestTimers: ht,
+      stats: { ...s.stats, totalMerges: s.stats.totalMerges + 1, maxLevel: Math.max(s.stats.maxLevel, newLevel), totalCoinsEarned: s.stats.totalCoinsEarned + finalBonus },
     }));
 
-    // 플로팅 텍스트 (콤보 표시)
-    const comboLabel = getComboLabel(newCombo);
-    const text = comboLabel ? `+${finalBonus} 🪙 ${comboLabel}` : `+${finalBonus} 🪙`;
-    get().addFloatingText(text, toR, toC);
+    const cl = getComboLabel(newCombo);
+    get().addFloatingText(cl ? `+${finalBonus} 🪙 ${cl}` : `+${finalBonus} 🪙`, toR, toC);
     get()._startHarvestTimer(mergedItem.id, newLevel);
     get()._markFresh(mergedItem.id);
     get()._updateQuestProgress();
-    return newCombo; // 콤보 수 반환 (Grid에서 이펙트용)
+    return newCombo;
   },
 
-  // === 스왑/이동 ===
-  swapItems: (fromR, fromC, toR, toC) => {
-    const { grid } = get();
+  swapItems: (fromR, fromC, toR, toC) => { const g = cloneGrid(get().grid); [g[fromR][fromC], g[toR][toC]] = [g[toR][toC], g[fromR][fromC]]; set({ grid: g }); },
+  moveItem: (fromR, fromC, toR, toC) => { const g = cloneGrid(get().grid); g[toR][toC] = g[fromR][fromC]; g[fromR][fromC] = null; set({ grid: g }); },
+
+  // === 주문 ===
+  tickOrders: () => {
+    const { orders, maxOrders, nextOrderAt, totalDeliveries, unlockedTrees } = get();
+    const now = Date.now();
+    if (orders.length < maxOrders && nextOrderAt && now >= nextOrderAt) {
+      const order = generateOrder(totalDeliveries, unlockedTrees);
+      const nextDelay = 60_000 + Math.random() * 60_000;
+      set({ orders: [...orders, order], nextOrderAt: now + nextDelay });
+    }
+  },
+
+  canDeliver: (orderId) => {
+    const { orders, grid, gridSize } = get();
+    const order = orders.find(o => o.id === orderId);
+    if (!order) return false;
+    // 그리드에서 사용 가능한 아이템 수 세기
+    const available = {};
+    for (let r = 0; r < gridSize; r++)
+      for (let c = 0; c < gridSize; c++) {
+        const item = grid[r]?.[c];
+        if (item && item.special !== 'rock') {
+          const key = `${item.tree || 'animal'}-${item.level}`;
+          available[key] = (available[key] || 0) + 1;
+        }
+      }
+    for (const req of order.requirements) {
+      const key = `${req.tree}-${req.level}`;
+      if ((available[key] || 0) < req.count) return false;
+    }
+    return true;
+  },
+
+  deliverOrder: (orderId) => {
+    const { orders, grid, gridSize, permanentBuffs } = get();
+    const order = orders.find(o => o.id === orderId);
+    if (!order || !get().canDeliver(orderId)) return false;
+
     const newGrid = cloneGrid(grid);
-    [newGrid[fromR][fromC], newGrid[toR][toC]] = [newGrid[toR][toC], newGrid[fromR][fromC]];
-    set({ grid: newGrid });
+    const ht = { ...get().harvestTimers };
+    // 그리드에서 아이템 제거
+    for (const req of order.requirements) {
+      let remaining = req.count;
+      for (let r = 0; r < gridSize && remaining > 0; r++)
+        for (let c = 0; c < gridSize && remaining > 0; c++) {
+          const item = newGrid[r]?.[c];
+          if (item && (item.tree || 'animal') === req.tree && item.level === req.level && item.special !== 'rock') {
+            delete ht[item.id];
+            newGrid[r][c] = null;
+            remaining--;
+          }
+        }
+    }
+
+    const rewardMult = permanentBuffs.includes('orderReward') ? 1.5 : 1;
+    const coinReward = Math.floor(order.coinReward * get().getBoostMultiplier() * rewardMult);
+    const fameReward = order.fameReward;
+
+    set(s => ({
+      grid: newGrid,
+      coins: s.coins + coinReward,
+      orders: s.orders.filter(o => o.id !== orderId),
+      totalDeliveries: s.totalDeliveries + 1,
+      harvestTimers: ht,
+      stats: { ...s.stats, totalCoinsEarned: s.stats.totalCoinsEarned + coinReward },
+    }));
+    get().addFame(fameReward);
+    get().addFloatingText(`+${coinReward} 🪙 +${fameReward} ⭐`, 2, 2);
+    get()._updateQuestProgress();
+    return true;
   },
 
-  moveItem: (fromR, fromC, toR, toC) => {
-    const { grid } = get();
-    const newGrid = cloneGrid(grid);
-    newGrid[toR][toC] = newGrid[fromR][fromC];
-    newGrid[fromR][fromC] = null;
-    set({ grid: newGrid });
-  },
-
-  // === Phase 5: 탭 수확 ===
-  _startHarvestTimer: (itemId, level) => {
-    const cooldown = getHarvestCooldown(level);
-    const readyAt = Date.now() + cooldown;
-    const expiresAt = readyAt + HARVEST_EXPIRE;
-    set(state => ({
-      harvestTimers: { ...state.harvestTimers, [itemId]: { readyAt, expiresAt } },
+  skipOrder: (orderId) => {
+    set(s => ({
+      orders: s.orders.filter(o => o.id !== orderId),
+      nextOrderAt: Date.now() + 60_000, // 60초 패널티
     }));
   },
 
+  // === 명성 & 왕국 레벨 ===
+  addFame: (amount) => {
+    const { fame, kingdomLevel, unlockedTrees, gridSize } = get();
+    const newFame = fame + amount;
+    let newLevel = kingdomLevel;
+    let unlock = null;
+
+    for (const kd of KINGDOM_LEVELS) {
+      if (newFame >= kd.fame && kd.level > newLevel) {
+        newLevel = kd.level;
+        unlock = kd.unlock;
+      }
+    }
+
+    const updates = { fame: newFame };
+    if (newLevel > kingdomLevel) {
+      updates.kingdomLevel = newLevel;
+      updates.levelUpUnlock = unlock;
+      // 자동 해금 처리
+      if (unlock) {
+        if (unlock.type === 'tree' && !unlockedTrees.includes(unlock.value)) {
+          updates.unlockedTrees = [...unlockedTrees, unlock.value];
+        }
+        if (unlock.type === 'grid' && unlock.value > gridSize) {
+          const g = get().grid;
+          const ns = unlock.value;
+          updates.grid = Array(ns).fill(null).map((_, r) => Array(ns).fill(null).map((_, c) => (r < gridSize && c < gridSize ? g[r]?.[c] : null)));
+          updates.gridSize = ns;
+        }
+        if (unlock.type === 'orderSlots') {
+          updates.maxOrders = unlock.value;
+        }
+      }
+    }
+    set(updates);
+  },
+
+  clearLevelUpUnlock: () => set({ levelUpUnlock: null }),
+
+  // === 수확 ===
   harvestItem: (r, c) => {
     const { grid, harvestTimers } = get();
     const item = grid[r]?.[c];
-    if (!item) return false;
+    if (!item || item.special === 'rock') return false;
     const timer = harvestTimers[item.id];
     if (!timer || Date.now() < timer.readyAt) return false;
-
-    const treeItem = getTreeItem(item.tree || 'animal', item.level);
-    const harvestAmount = Math.floor(treeItem.coinsPerSec * 5 * get().getBoostMultiplier());
-    if (harvestAmount <= 0) return false;
-
-    // 타이머 리셋
-    const cooldown = getHarvestCooldown(item.level);
-    const newReadyAt = Date.now() + cooldown;
-    const newExpiresAt = newReadyAt + HARVEST_EXPIRE;
-
-    set(state => ({
-      coins: state.coins + harvestAmount,
-      harvestTimers: {
-        ...state.harvestTimers,
-        [item.id]: { readyAt: newReadyAt, expiresAt: newExpiresAt },
-      },
-      stats: { ...state.stats, totalCoinsEarned: state.stats.totalCoinsEarned + harvestAmount },
+    const ti = getTreeItem(item.tree || 'animal', item.level);
+    const mult = get().getBoostMultiplier() * (get().permanentBuffs.includes('autoIncome') ? 1.3 : 1);
+    const amount = Math.floor(ti.coinsPerSec * 5 * mult);
+    if (amount <= 0) return false;
+    const cd = getHarvestCooldown(item.level);
+    set(s => ({
+      coins: s.coins + amount,
+      harvestTimers: { ...s.harvestTimers, [item.id]: { readyAt: Date.now() + cd, expiresAt: Date.now() + cd + HARVEST_EXPIRE } },
+      stats: { ...s.stats, totalCoinsEarned: s.stats.totalCoinsEarned + amount },
     }));
-    get().addFloatingText(`+${harvestAmount} 🪙`, r, c);
+    get().addFloatingText(`+${amount} 🪙`, r, c);
     return true;
   },
 
   tickHarvest: () => {
     const { harvestTimers, grid, gridSize } = get();
     const now = Date.now();
+    const nt = { ...harvestTimers };
     let changed = false;
-    const newTimers = { ...harvestTimers };
-
-    // 만료된 타이머 제거 & 재시작
-    for (const [itemId, timer] of Object.entries(newTimers)) {
-      if (now > timer.expiresAt) {
-        // 아이템이 아직 그리드에 있는지 확인
-        let found = false;
-        for (let r = 0; r < gridSize; r++)
-          for (let c = 0; c < gridSize; c++)
-            if (grid[r]?.[c]?.id === itemId) { found = true; break; }
-        if (found) {
-          // 재시작
-          const item = Object.values(grid.flat().filter(Boolean)).find(i => i.id === itemId);
-          if (item) {
-            const cooldown = getHarvestCooldown(item.level);
-            newTimers[itemId] = { readyAt: now + cooldown, expiresAt: now + cooldown + HARVEST_EXPIRE };
-            changed = true;
-          }
-        } else {
-          delete newTimers[itemId];
-          changed = true;
-        }
+    for (const [id, t] of Object.entries(nt)) {
+      if (now > t.expiresAt) {
+        let found = null;
+        for (let r = 0; r < gridSize; r++) for (let c = 0; c < gridSize; c++) if (grid[r]?.[c]?.id === id) found = grid[r][c];
+        if (found) { const cd = getHarvestCooldown(found.level); nt[id] = { readyAt: now + cd, expiresAt: now + cd + HARVEST_EXPIRE }; }
+        else delete nt[id];
+        changed = true;
       }
     }
-
-    // 타이머 없는 그리드 아이템에 타이머 추가
     for (let r = 0; r < gridSize; r++)
       for (let c = 0; c < gridSize; c++) {
         const item = grid[r]?.[c];
-        if (item && !newTimers[item.id]) {
-          const cooldown = getHarvestCooldown(item.level);
-          newTimers[item.id] = { readyAt: now + cooldown, expiresAt: now + cooldown + HARVEST_EXPIRE };
+        if (item && !nt[item.id] && item.special !== 'rock') {
+          nt[item.id] = { readyAt: now + getHarvestCooldown(item.level), expiresAt: now + getHarvestCooldown(item.level) + HARVEST_EXPIRE };
           changed = true;
         }
       }
-
-    if (changed) set({ harvestTimers: newTimers });
+    if (changed) set({ harvestTimers: nt });
   },
 
-  isHarvestReady: (itemId) => {
-    const timer = get().harvestTimers[itemId];
-    if (!timer) return false;
-    const now = Date.now();
-    return now >= timer.readyAt && now <= timer.expiresAt;
+  isHarvestReady: (itemId) => { const t = get().harvestTimers[itemId]; return t && Date.now() >= t.readyAt && Date.now() <= t.expiresAt; },
+
+  // === 바위 ===
+  spawnRock: () => {
+    const { grid, gridSize } = get();
+    const cell = getRandomEmptyCell(grid, gridSize);
+    if (!cell) return;
+    const rock = { id: 'rock-' + Date.now().toString(36), level: 0, tree: 'none', special: 'rock' };
+    const newGrid = cloneGrid(grid);
+    newGrid[cell.r][cell.c] = rock;
+    set({ grid: newGrid });
   },
 
-  // === Phase 5: 부스트 ===
-  activateBoost: () => {
-    const { boostCooldownEnd } = get();
-    if (boostCooldownEnd && Date.now() < boostCooldownEnd) return false;
-    const now = Date.now();
-    set({
-      boostActive: true,
-      boostEndTime: now + 180_000,
-      boostCooldownEnd: now + 600_000,
-    });
+  removeRock: (r, c) => {
+    const { grid, coins } = get();
+    const item = grid[r]?.[c];
+    if (!item || item.special !== 'rock') return false;
+    const cost = 50;
+    if (coins < cost) return false;
+    const newGrid = cloneGrid(grid);
+    newGrid[r][c] = null;
+    set({ grid: newGrid, coins: coins - cost });
     return true;
   },
 
-  tickBoost: () => {
-    const { boostActive, boostEndTime } = get();
-    if (boostActive && Date.now() >= boostEndTime) {
-      set({ boostActive: false, boostEndTime: null });
-    }
+  // === 부스트 ===
+  activateBoost: () => {
+    const { boostCooldownEnd } = get();
+    if (boostCooldownEnd && Date.now() < boostCooldownEnd) return false;
+    set({ boostActive: true, boostEndTime: Date.now() + 180_000, boostCooldownEnd: Date.now() + 600_000 });
+    return true;
   },
-
+  tickBoost: () => { if (get().boostActive && Date.now() >= get().boostEndTime) set({ boostActive: false, boostEndTime: null }); },
   getBoostTimeRemaining: () => {
     const { boostActive, boostEndTime, boostCooldownEnd } = get();
     const now = Date.now();
@@ -390,95 +410,84 @@ const useGameStore = create((set, get) => ({
     return { type: 'ready', remaining: 0 };
   },
 
-  // === 퀘스트 보상 ===
+  // === 프레스티지 ===
+  canPrestige: () => get().kingdomLevel >= 10,
+  prestige: () => {
+    if (!get().canPrestige()) return false;
+    const { fame } = get();
+    const bonusCrowns = Math.floor((fame - 15000) / 5000);
+    const crowns = 3 + Math.max(0, bonusCrowns);
+    const startCoins = get().permanentBuffs.includes('startCoins') ? 500 : 100;
+    set(s => ({
+      grid: createEmptyGrid(), gridSize: DEFAULT_GRID_SIZE,
+      coins: startCoins, totalSpawns: 0,
+      activeTree: 'animal', unlockedTrees: ['animal'],
+      stats: { totalMerges: 0, totalSpawns: 0, maxLevel: 1, totalCoinsEarned: 0 },
+      questProgress: {}, claimedQuests: [],
+      freeSpawnCharges: 3, lastFreeSpawnTick: Date.now(),
+      comboCount: 0, lastMergeTime: 0, harvestTimers: {},
+      boostActive: false, boostEndTime: null, boostCooldownEnd: null,
+      orders: [], maxOrders: 3, nextOrderAt: Date.now() + 10_000, totalDeliveries: 0,
+      fame: 0, kingdomLevel: 1, levelUpUnlock: null,
+      crownPoints: s.crownPoints + crowns,
+      totalPrestiges: s.totalPrestiges + 1,
+      lastTick: Date.now(), lastSaved: Date.now(),
+      floatingTexts: [], freshItemIds: new Set(),
+      // discovered + permanentBuffs 유지
+    }));
+    return crowns;
+  },
+
+  purchaseBuff: (buffId) => {
+    const { crownPoints, permanentBuffs } = get();
+    const buff = PRESTIGE_BUFFS[buffId];
+    if (!buff || permanentBuffs.includes(buffId) || crownPoints < buff.cost) return false;
+    set({ crownPoints: crownPoints - buff.cost, permanentBuffs: [...permanentBuffs, buffId] });
+    return true;
+  },
+  getPrestigeBuffs: () => PRESTIGE_BUFFS,
+
+  // === 퀘스트 ===
   claimQuest: (questId) => {
     const { questProgress, claimedQuests } = get();
     const quest = QUESTS.find(q => q.id === questId);
-    if (!quest) return false;
-    if (claimedQuests.includes(questId)) return false;
-    if ((questProgress[questId] || 0) < quest.target) return false;
-    set(state => ({
-      coins: state.coins + quest.reward,
-      claimedQuests: [...state.claimedQuests, questId],
-    }));
+    if (!quest || claimedQuests.includes(questId) || (questProgress[questId] || 0) < quest.target) return false;
+    set(s => ({ coins: s.coins + quest.reward, claimedQuests: [...s.claimedQuests, questId] }));
     get().addFloatingText(`+${quest.reward} 🪙`, 2, 2);
     return true;
   },
 
-  // === 트리 ===
   setActiveTree: (tree) => set({ activeTree: tree }),
 
-  unlockTree: (treeId) => {
-    const { unlockedTrees, coins } = get();
-    if (unlockedTrees.includes(treeId)) return false;
-    const treeDef = TREES.find(t => t.id === treeId);
-    if (!treeDef || coins < treeDef.unlockCost) return false;
-    set(state => ({
-      coins: state.coins - treeDef.unlockCost,
-      unlockedTrees: [...state.unlockedTrees, treeId],
-      activeTree: treeId,
-    }));
-    return true;
-  },
-
-  // === 그리드 확장 ===
-  expandGrid: () => {
-    const { grid, gridSize, coins } = get();
-    const newSize = gridSize + 1;
-    if (newSize > 7) return false;
-    const cost = newSize === 6 ? 5000 : 15000;
-    if (coins < cost) return false;
-    const newGrid = Array(newSize).fill(null).map((_, r) =>
-      Array(newSize).fill(null).map((_, c) => (r < gridSize && c < gridSize ? grid[r][c] : null))
-    );
-    set({ grid: newGrid, gridSize: newSize, coins: coins - cost });
-    return true;
-  },
-
-  getExpandCost: () => {
-    const { gridSize } = get();
-    if (gridSize >= 7) return null;
-    return gridSize + 1 === 6 ? 5000 : 15000;
-  },
-
-  // === 자동 수익 (부스트 적용) ===
+  // === 자동 수익 ===
   tick: () => {
-    const { grid, lastTick, gridSize } = get();
+    const { grid, lastTick, gridSize, permanentBuffs } = get();
     const now = Date.now();
     const delta = (now - lastTick) / 1000;
-    const boostMult = get().getBoostMultiplier();
+    const bMult = get().getBoostMultiplier() * (permanentBuffs.includes('autoIncome') ? 1.3 : 1);
     let income = 0;
     for (let r = 0; r < gridSize; r++)
       for (let c = 0; c < gridSize; c++)
-        if (grid[r]?.[c]) {
-          const item = grid[r][c];
-          income += getTreeItem(item.tree || 'animal', item.level).coinsPerSec * delta * boostMult;
-        }
-    if (income > 0) {
-      set(state => ({
-        coins: state.coins + income,
-        lastTick: now,
-        stats: { ...state.stats, totalCoinsEarned: state.stats.totalCoinsEarned + income },
-      }));
-    } else {
-      set({ lastTick: now });
-    }
+        if (grid[r]?.[c] && grid[r][c].special !== 'rock')
+          income += getTreeItem(grid[r][c].tree || 'animal', grid[r][c].level).coinsPerSec * delta * bMult;
+    if (income > 0) set(s => ({ coins: s.coins + income, lastTick: now, stats: { ...s.stats, totalCoinsEarned: s.stats.totalCoinsEarned + income } }));
+    else set({ lastTick: now });
   },
 
   // === 저장/로드 ===
   save: () => {
     const s = get();
-    const data = {
+    localStorage.setItem(SAVE_KEY, JSON.stringify({
       grid: s.grid, coins: s.coins, totalSpawns: s.totalSpawns,
-      discovered: [...s.discovered],
-      stats: s.stats, claimedQuests: s.claimedQuests,
+      discovered: [...s.discovered], stats: s.stats, claimedQuests: s.claimedQuests,
       gridSize: s.gridSize, activeTree: s.activeTree, unlockedTrees: s.unlockedTrees,
       freeSpawnCharges: s.freeSpawnCharges, lastFreeSpawnTick: s.lastFreeSpawnTick,
-      boostCooldownEnd: s.boostCooldownEnd,
-      harvestTimers: s.harvestTimers,
+      boostCooldownEnd: s.boostCooldownEnd, harvestTimers: s.harvestTimers,
+      orders: s.orders, maxOrders: s.maxOrders, nextOrderAt: s.nextOrderAt, totalDeliveries: s.totalDeliveries,
+      fame: s.fame, kingdomLevel: s.kingdomLevel,
+      crownPoints: s.crownPoints, totalPrestiges: s.totalPrestiges, permanentBuffs: s.permanentBuffs,
       savedAt: Date.now(),
-    };
-    localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+    }));
     set({ lastSaved: Date.now() });
   },
 
@@ -486,28 +495,19 @@ const useGameStore = create((set, get) => ({
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return null;
     try {
-      const data = JSON.parse(raw);
-      const state = {
-        grid: data.grid,
-        coins: data.coins,
-        totalSpawns: data.totalSpawns,
-        discovered: new Set(data.discovered.map(d => typeof d === 'number' ? `animal-${d}` : d)),
+      const d = JSON.parse(raw);
+      const st = {
+        grid: d.grid, coins: d.coins, totalSpawns: d.totalSpawns,
+        discovered: new Set((d.discovered || []).map(x => typeof x === 'number' ? `animal-${x}` : x)),
         lastTick: Date.now(),
       };
-      if (data.stats) state.stats = data.stats;
-      if (data.claimedQuests) state.claimedQuests = data.claimedQuests;
-      if (data.gridSize) state.gridSize = data.gridSize;
-      if (data.activeTree) state.activeTree = data.activeTree;
-      if (data.unlockedTrees) state.unlockedTrees = data.unlockedTrees;
-      // Phase 5 필드
-      if (data.freeSpawnCharges != null) state.freeSpawnCharges = data.freeSpawnCharges;
-      if (data.lastFreeSpawnTick) state.lastFreeSpawnTick = data.lastFreeSpawnTick;
-      if (data.boostCooldownEnd) state.boostCooldownEnd = data.boostCooldownEnd;
-      if (data.harvestTimers) state.harvestTimers = data.harvestTimers;
-      set(state);
-      // 무료 소환 오프라인 충전 복원
+      // 호환
+      ['stats','claimedQuests','gridSize','activeTree','unlockedTrees','freeSpawnCharges','lastFreeSpawnTick',
+       'boostCooldownEnd','harvestTimers','orders','maxOrders','nextOrderAt','totalDeliveries',
+       'fame','kingdomLevel','crownPoints','totalPrestiges','permanentBuffs'].forEach(k => { if (d[k] != null) st[k] = d[k]; });
+      set(st);
       setTimeout(() => { get().tickFreeSpawn(); get()._updateQuestProgress(); }, 0);
-      return data;
+      return d;
     } catch { return null; }
   },
 
@@ -517,50 +517,47 @@ const useGameStore = create((set, get) => ({
     let income = 0;
     for (let r = 0; r < (gridSize || 5); r++)
       for (let c = 0; c < (gridSize || 5); c++)
-        if (grid[r]?.[c]) {
-          const item = grid[r][c];
-          income += getTreeItem(item.tree || 'animal', item.level).coinsPerSec * elapsed;
-        }
+        if (grid[r]?.[c] && grid[r][c].special !== 'rock')
+          income += getTreeItem(grid[r][c].tree || 'animal', grid[r][c].level).coinsPerSec * elapsed;
     return { income: Math.floor(income), elapsed };
   },
 
   addFloatingText: (text, r, c) => {
     const id = Date.now() + Math.random();
-    set(state => ({ floatingTexts: [...state.floatingTexts, { id, text, r, c }] }));
-    setTimeout(() => {
-      set(state => ({ floatingTexts: state.floatingTexts.filter(t => t.id !== id) }));
-    }, 1200);
+    set(s => ({ floatingTexts: [...s.floatingTexts, { id, text, r, c }] }));
+    setTimeout(() => set(s => ({ floatingTexts: s.floatingTexts.filter(t => t.id !== id) })), 1200);
   },
 
   resetGame: () => {
     localStorage.removeItem(SAVE_KEY);
     set({
-      grid: createEmptyGrid(), gridSize: DEFAULT_GRID_SIZE,
-      coins: 100, totalSpawns: 0,
+      grid: createEmptyGrid(), gridSize: DEFAULT_GRID_SIZE, coins: 100, totalSpawns: 0,
       discovered: new Set(['animal-1']), activeTree: 'animal', unlockedTrees: ['animal'],
       stats: { totalMerges: 0, totalSpawns: 0, maxLevel: 1, totalCoinsEarned: 0 },
       questProgress: {}, claimedQuests: [],
-      freeSpawnCharges: 3, lastFreeSpawnTick: Date.now(),
-      comboCount: 0, lastMergeTime: 0,
-      harvestTimers: {},
-      boostActive: false, boostEndTime: null, boostCooldownEnd: null,
-      lastTick: Date.now(), lastSaved: Date.now(),
-      floatingTexts: [], freshItemIds: new Set(),
+      freeSpawnCharges: 3, lastFreeSpawnTick: Date.now(), comboCount: 0, lastMergeTime: 0,
+      harvestTimers: {}, boostActive: false, boostEndTime: null, boostCooldownEnd: null,
+      orders: [], maxOrders: 3, nextOrderAt: Date.now() + 10_000, totalDeliveries: 0,
+      fame: 0, kingdomLevel: 1, levelUpUnlock: null,
+      crownPoints: 0, totalPrestiges: 0, permanentBuffs: [],
+      lastTick: Date.now(), lastSaved: Date.now(), floatingTexts: [], freshItemIds: new Set(),
     });
   },
 
-  getSpawnCost: () => calcSpawnCost(get().totalSpawns),
+  getSpawnCost: () => {
+    let cost = calcSpawnCost(get().totalSpawns);
+    if (get().permanentBuffs.includes('spawnDiscount')) cost = Math.floor(cost * 0.85);
+    return cost;
+  },
 
   getIncomePerSec: () => {
-    const { grid, gridSize } = get();
-    const boostMult = get().getBoostMultiplier();
+    const { grid, gridSize, permanentBuffs } = get();
+    const bMult = get().getBoostMultiplier() * (permanentBuffs.includes('autoIncome') ? 1.3 : 1);
     let total = 0;
     for (let r = 0; r < (gridSize || 5); r++)
       for (let c = 0; c < (gridSize || 5); c++)
-        if (grid[r]?.[c]) {
-          const item = grid[r][c];
-          total += getTreeItem(item.tree || 'animal', item.level).coinsPerSec * boostMult;
-        }
+        if (grid[r]?.[c] && grid[r][c].special !== 'rock')
+          total += getTreeItem(grid[r][c].tree || 'animal', grid[r][c].level).coinsPerSec * bMult;
     return total;
   },
 }));

@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import TopBar from './components/TopBar';
+import OrderBoard from './components/OrderBoard';
 import { unlockAudio } from './utils/sound';
 import Grid from './components/Grid';
 import BottomBar from './components/BottomBar';
 import CollectionModal from './components/CollectionModal';
 import QuestModal from './components/QuestModal';
 import SettingsModal from './components/SettingsModal';
+import LevelUpModal from './components/LevelUpModal';
 import OfflineRewardModal from './components/OfflineRewardModal';
 import ErrorBoundary from './components/ErrorBoundary';
 import { useAutoIncome } from './hooks/useAutoIncome';
@@ -39,6 +41,7 @@ function Game() {
         onOpenQuests={() => setQuestsOpen(true)}
         onOpenSettings={() => setSettingsOpen(true)}
       />
+      <OrderBoard />
       <main className="main">
         <ErrorBoundary>
           <Grid />
@@ -48,6 +51,7 @@ function Game() {
       <CollectionModal open={collectionOpen} onClose={() => setCollectionOpen(false)} />
       <QuestModal open={questsOpen} onClose={() => setQuestsOpen(false)} />
       <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <LevelUpModal />
       <OfflineRewardModal reward={reward} onClose={clearReward} />
     </div>
   );

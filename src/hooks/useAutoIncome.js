@@ -6,6 +6,7 @@ export const useAutoIncome = () => {
   const tickFreeSpawn = useGameStore(s => s.tickFreeSpawn);
   const tickHarvest = useGameStore(s => s.tickHarvest);
   const tickBoost = useGameStore(s => s.tickBoost);
+  const tickOrders = useGameStore(s => s.tickOrders);
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -13,7 +14,8 @@ export const useAutoIncome = () => {
       tickFreeSpawn();
       tickHarvest();
       tickBoost();
+      tickOrders();
     }, 1000);
     return () => clearInterval(id);
-  }, [tick, tickFreeSpawn, tickHarvest, tickBoost]);
+  }, [tick, tickFreeSpawn, tickHarvest, tickBoost, tickOrders]);
 };

@@ -1,0 +1,86 @@
+.board {
+  display: flex;
+  gap: 6px;
+  padding: 8px 12px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.board::-webkit-scrollbar { display: none; }
+
+.card {
+  flex-shrink: 0;
+  background: rgba(255,255,255,0.06);
+  border: 1.5px solid rgba(255,255,255,0.12);
+  border-radius: 12px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 130px;
+}
+
+.card.ready {
+  border-color: #ffd700;
+  background: rgba(255,215,0,0.08);
+}
+
+.items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  font-size: 0.85rem;
+}
+
+.req {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  padding: 2px 4px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 6px;
+  font-size: 0.75rem;
+}
+
+.req.met {
+  background: rgba(46,204,113,0.15);
+}
+
+.reward {
+  font-size: 0.7rem;
+  color: #ffd700;
+  font-weight: 600;
+}
+
+.actions {
+  display: flex;
+  gap: 4px;
+}
+
+.deliverBtn {
+  flex: 1;
+  padding: 5px 8px;
+  background: linear-gradient(135deg, #2ecc71, #27ae60);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.deliverBtn:disabled {
+  background: rgba(255,255,255,0.1);
+  color: rgba(255,255,255,0.4);
+  cursor: not-allowed;
+}
+
+.skipBtn {
+  padding: 5px 8px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 8px;
+  color: rgba(255,255,255,0.5);
+  font-size: 0.7rem;
+  cursor: pointer;
+}

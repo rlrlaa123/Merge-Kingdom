@@ -45,12 +45,11 @@ const Grid = () => {
     const { r, c } = over.data.current;
     const [fromR, fromC] = parseKey(draggingItem.cellKey);
     const targetItem = grid[r][c];
-    if (
-      targetItem &&
-      targetItem.level === draggingItem.level &&
-      (targetItem.tree || 'animal') === (draggingItem.tree || 'animal') &&
-      (r !== fromR || c !== fromC)
-    ) {
+    const isWild = targetItem?.special === 'wildcard' || draggingItem?.special === 'wildcard';
+    const sameTree = targetItem && (targetItem.tree || 'animal') === (draggingItem.tree || 'animal');
+    const sameLevel = targetItem && targetItem.level === draggingItem.level;
+    const canMerge = targetItem && sameTree && (sameLevel || isWild) && (r !== fromR || c !== fromC) && targetItem.special !== 'rock';
+    if (canMerge) {
       setMergeTargetKey(`${r}-${c}`);
     } else {
       setMergeTargetKey(null);
@@ -71,7 +70,10 @@ const Grid = () => {
     const toItem = grid[toR][toC];
 
     if (toItem) {
-      if (fromItem.level === toItem.level && (fromItem.tree || 'animal') === (toItem.tree || 'animal')) {
+      const isW = fromItem.special === 'wildcard' || toItem.special === 'wildcard';
+      const sT = (fromItem.tree || 'animal') === (toItem.tree || 'animal');
+      const sL = fromItem.level === toItem.level;
+      if (sT && (sL || isW) && toItem.special !== 'rock') {
         const combo = mergeItems(fromR, fromC, toR, toC);
         if (combo) {
           sfxMerge();

@@ -72,3 +72,28 @@
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-4px); }
 }
+
+/* 특수 아이템 */
+.golden .emoji {
+  filter: drop-shadow(0 0 8px rgba(255, 215, 0, 0.8));
+}
+
+.wildcard .emoji {
+  animation: rainbowGlow 2s linear infinite;
+}
+
+@keyframes rainbowGlow {
+  0%   { filter: drop-shadow(0 0 6px #ff0000); }
+  33%  { filter: drop-shadow(0 0 6px #00ff00); }
+  66%  { filter: drop-shadow(0 0 6px #0000ff); }
+  100% { filter: drop-shadow(0 0 6px #ff0000); }
+}
+
+.rock {
+  cursor: pointer;
+}
+
+.rock .emoji {
+  filter: grayscale(0.4);
+  opacity: 0.7;
+}

@@ -2,46 +2,97 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 16px;
+  padding: 8px 12px;
   background: rgba(255,255,255,0.05);
   border-bottom: 1px solid rgba(255,255,255,0.1);
+  gap: 8px;
 }
 
-.coinInfo {
+.left { flex: 1; min-width: 0; }
+
+.coinRow {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: baseline;
+  gap: 6px;
 }
 
 .coins {
-  font-size: 1.3rem;
+  font-size: 1.2rem;
   font-weight: 700;
   color: #ffd700;
 }
 
 .income {
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   color: #a0c4ff;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.boostBadge {
+  font-size: 0.6rem;
+  background: rgba(255,215,0,0.2);
+  color: #ffd700;
+  padding: 1px 4px;
+  border-radius: 4px;
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0%,100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.fameRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.fameLabel {
+  font-size: 0.65rem;
+  color: rgba(255,255,255,0.7);
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.fameBar {
+  flex: 1;
+  height: 4px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.fameFill {
+  height: 100%;
+  background: linear-gradient(90deg, #ffd700, #ff9500);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.fameText {
+  font-size: 0.55rem;
+  color: rgba(255,255,255,0.5);
+  white-space: nowrap;
 }
 
 .buttons {
   display: flex;
-  gap: 4px;
+  gap: 2px;
+  flex-shrink: 0;
 }
 
 .iconBtn {
   background: none;
   border: none;
-  font-size: 1.5rem;
+  font-size: 1.3rem;
   cursor: pointer;
   padding: 4px;
   border-radius: 8px;
-  transition: background 0.2s;
   position: relative;
-}
-
-.iconBtn:hover {
-  background: rgba(255,255,255,0.1);
 }
 
 .badge {
@@ -50,13 +101,13 @@
   right: -4px;
   background: #ff4444;
   color: white;
-  font-size: 0.6rem;
+  font-size: 0.55rem;
   font-weight: 800;
-  min-width: 16px;
-  height: 16px;
-  border-radius: 8px;
+  min-width: 14px;
+  height: 14px;
+  border-radius: 7px;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0 3px;
+  padding: 0 2px;
 }

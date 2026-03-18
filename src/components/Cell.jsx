@@ -28,6 +28,7 @@ const Cell = memo(({ r, c, item, isMergeTarget, isMergedCell }) => {
           key={item.id}
           id={item.id}
           level={item.level}
+          tree={item.tree}
           isMerged={isMergedCell}
           isDragging={isDragging}
           dragRef={setDragRef}

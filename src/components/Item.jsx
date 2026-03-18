@@ -1,11 +1,11 @@
 import { memo } from 'react';
-import { getItem } from '../data/mergeTree';
+import { getTreeItem } from '../data/mergeTree';
 import useGameStore from '../store/useGameStore';
 import styles from './Item.module.css';
 
-const Item = memo(({ id, level, isMerged, isDragging, dragRef, dragListeners, dragAttributes }) => {
+const Item = memo(({ id, level, tree, isMerged, isDragging, dragRef, dragListeners, dragAttributes }) => {
   const isFresh = useGameStore(s => s.freshItemIds.has(id));
-  const itemData = getItem(level);
+  const itemData = getTreeItem(tree || 'animal', level);
 
   return (
     <div

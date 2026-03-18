@@ -24,6 +24,11 @@
   color: #a0c4ff;
 }
 
+.buttons {
+  display: flex;
+  gap: 4px;
+}
+
 .iconBtn {
   background: none;
   border: none;
@@ -32,8 +37,26 @@
   padding: 4px;
   border-radius: 8px;
   transition: background 0.2s;
+  position: relative;
 }
 
 .iconBtn:hover {
   background: rgba(255,255,255,0.1);
+}
+
+.badge {
+  position: absolute;
+  top: -2px;
+  right: -4px;
+  background: #ff4444;
+  color: white;
+  font-size: 0.6rem;
+  font-weight: 800;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
 }

@@ -7,15 +7,16 @@ import {
   DragOverlay,
 } from '@dnd-kit/core';
 import { useState, useCallback, useMemo } from 'react';
-import { getItem } from '../data/mergeTree';
+import { getTreeItem } from '../data/mergeTree';
 import Cell from './Cell';
 import useGameStore from '../store/useGameStore';
-import { GRID_SIZE, parseKey } from '../utils/gridHelpers';
+import { parseKey } from '../utils/gridHelpers';
 import { sfxPickup, sfxMerge, sfxDrop } from '../utils/sound';
 import styles from './Grid.module.css';
 
 const Grid = () => {
   const grid = useGameStore(s => s.grid);
+  const gridSize = useGameStore(s => s.gridSize);
   const mergeItems = useGameStore(s => s.mergeItems);
   const swapItems = useGameStore(s => s.swapItems);
   const moveItem = useGameStore(s => s.moveItem);
@@ -43,7 +44,12 @@ const Grid = () => {
     const { r, c } = over.data.current;
     const [fromR, fromC] = parseKey(draggingItem.cellKey);
     const targetItem = grid[r][c];
-    if (targetItem && targetItem.level === draggingItem.level && (r !== fromR || c !== fromC)) {
+    if (
+      targetItem &&
+      targetItem.level === draggingItem.level &&
+      (targetItem.tree || 'animal') === (draggingItem.tree || 'animal') &&
+      (r !== fromR || c !== fromC)
+    ) {
       setMergeTargetKey(`${r}-${c}`);
     } else {
       setMergeTargetKey(null);
@@ -64,7 +70,7 @@ const Grid = () => {
     const toItem = grid[toR][toC];
 
     if (toItem) {
-      if (fromItem.level === toItem.level) {
+      if (fromItem.level === toItem.level && (fromItem.tree || 'animal') === (toItem.tree || 'animal')) {
         const merged = mergeItems(fromR, fromC, toR, toC);
         if (merged) {
           sfxMerge();
@@ -81,16 +87,21 @@ const Grid = () => {
     }
   }, [grid, mergeItems, swapItems, moveItem]);
 
+  const gridStyle = {
+    gridTemplateColumns: `repeat(${gridSize}, 1fr)`,
+    gridTemplateRows: `repeat(${gridSize}, 1fr)`,
+  };
+
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
-      <div className={styles.grid}>
-        {Array.from({ length: GRID_SIZE }, (_, r) =>
-          Array.from({ length: GRID_SIZE }, (_, c) => (
+      <div className={styles.grid} style={gridStyle}>
+        {Array.from({ length: gridSize }, (_, r) =>
+          Array.from({ length: gridSize }, (_, c) => (
             <Cell
               key={`${r}-${c}`}
               r={r}
               c={c}
-              item={grid[r][c]}
+              item={grid[r]?.[c]}
               isMergeTarget={mergeTargetKey === `${r}-${c}`}
               isMergedCell={mergedKey === `${r}-${c}`}
             />
@@ -100,7 +111,7 @@ const Grid = () => {
       <DragOverlay dropAnimation={null}>
         {draggingItem && (
           <div className={styles.dragOverlay}>
-            <span>{getItem(draggingItem.level).emoji}</span>
+            <span>{getTreeItem(draggingItem.tree || 'animal', draggingItem.level).emoji}</span>
           </div>
         )}
       </DragOverlay>

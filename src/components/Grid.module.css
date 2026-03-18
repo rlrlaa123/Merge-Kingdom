@@ -1,6 +1,6 @@
 .grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  /* grid-template-columns set dynamically via inline style */
   gap: clamp(6px, 2vw, 10px);
   padding: clamp(12px, 3vw, 20px);
   width: 100%;

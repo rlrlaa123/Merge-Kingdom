@@ -43,13 +43,27 @@ interface DiffSpec {
 
 const getDiffSpec = (difficulty: Difficulty, kingdomLevel: number): DiffSpec => {
   const levelCap = Math.min(5, 1 + Math.floor(kingdomLevel * 0.6));
+  // 수량 스케일링: base + floor(kingdomLevel / 3)
+  const qScale = Math.floor(kingdomLevel / 3);
   switch (difficulty) {
     case 'easy':
-      return { maxLevel: Math.min(2, levelCap), minItems: 1, maxItems: 2, coinBase: 10, fameBase: 5, rewardMult: 1 };
+      return {
+        maxLevel: Math.max(1, Math.min(levelCap - 1, 3)),
+        minItems: 1, maxItems: 1 + qScale,
+        coinBase: 10, fameBase: 5, rewardMult: 1,
+      };
     case 'medium':
-      return { maxLevel: Math.min(3, levelCap), minItems: 1, maxItems: 3, coinBase: 25, fameBase: 12, rewardMult: 2 };
+      return {
+        maxLevel: Math.min(levelCap, 4),
+        minItems: 1, maxItems: 1 + qScale,
+        coinBase: 25, fameBase: 12, rewardMult: 2,
+      };
     case 'hard':
-      return { maxLevel: Math.min(4, levelCap), minItems: 2, maxItems: 3, coinBase: 60, fameBase: 30, rewardMult: 4 };
+      return {
+        maxLevel: Math.min(levelCap + 1, 5),
+        minItems: 2, maxItems: 2 + qScale,
+        coinBase: 60, fameBase: 30, rewardMult: 4,
+      };
   }
 };
 
@@ -68,11 +82,19 @@ export const generateOrder = (
 
   const usableChains = char.preferredChains.filter(ch => unlockedChains.includes(ch));
   const chains = usableChains.length > 0 ? usableChains : unlockedChains;
-  const itemCount = randInt(spec.minItems, spec.maxItems);
+  // 아이템 종류 수: 1~2 (easy/medium), 2~3 (hard)
+  const typeCount = difficulty === 'hard'
+    ? randInt(2, Math.min(3, chains.length >= 2 ? 3 : 2))
+    : randInt(1, 2);
   const items: OrderItem[] = [];
   const mustMultiChain = difficulty === 'hard' && chains.length >= 2;
 
-  for (let i = 0; i < itemCount; i++) {
+  // 수량 스케일링: base + floor(kingdomLevel / 3)
+  const qScale = Math.floor(kingdomLevel / 3);
+  const baseQty = difficulty === 'hard' ? 2 : 1;
+  const qty = baseQty + qScale;
+
+  for (let i = 0; i < typeCount; i++) {
     let chain: string;
     if (mustMultiChain && i < 2) {
       const usedChains = items.map(it => it.chain);
@@ -86,7 +108,7 @@ export const generateOrder = (
     if (!chainItem) continue;
     const existing = items.find(it => it.chain === chain && it.level === level);
     if (existing) { existing.quantity += 1; }
-    else { items.push({ chain, level, emoji: chainItem.emoji, name: chainItem.name, quantity: 1 }); }
+    else { items.push({ chain, level, emoji: chainItem.emoji, name: chainItem.name, quantity: qty }); }
   }
 
   const tapCost = items.reduce((sum, it) => sum + Math.pow(2, it.level - 1) * it.quantity, 0);

@@ -362,7 +362,9 @@ const useGameStore = create<GameStore>((set, get) => ({
       }
     }
 
-    const newEnergyCurrent = energy.current;
+    const newEnergyCurrent = newKL > kingdomLevel
+      ? Math.max(energy.current, newEnergyCap)
+      : energy.current;
 
     // 해당 주문을 delivered로 마킹
     let newOrders = orders.map(o => o.id === orderId ? { ...o, delivered: true } : o);

@@ -1,6 +1,4 @@
-import { useState } from 'react';
 import useGameStore, { type BoardItem } from '../store/gameStore';
-import ItemInfoModal from './ItemInfoModal';
 import styles from './OrderBoard.module.css';
 
 const DIFF_CLASS: Record<string, string> = {
@@ -9,13 +7,16 @@ const DIFF_CLASS: Record<string, string> = {
   hard: styles.hard,
 };
 
-const OrderBoard = () => {
+interface Props {
+  onItemClick?: (item: BoardItem) => void;
+}
+
+const OrderBoard = ({ onItemClick }: Props) => {
   const orders = useGameStore(s => s.orders);
   const canDeliver = useGameStore(s => s.canDeliver);
   const deliverOrder = useGameStore(s => s.deliverOrder);
   const board = useGameStore(s => s.board);
   const boardSize = useGameStore(s => s.boardSize);
-  const [selectedItem, setSelectedItem] = useState<BoardItem | null>(null);
 
   // 보드 아이템 카운팅
   const available: Record<string, number> = {};
@@ -68,7 +69,7 @@ const OrderBoard = () => {
                           className={`${styles.req} ${met ? styles.met : ''}`}
                           onClick={(e) => {
                             e.stopPropagation();
-                            setSelectedItem({ id: '', chain: item.chain, level: item.level });
+                            onItemClick?.({ id: '', chain: item.chain, level: item.level });
                           }}
                         >
                           {item.emoji}×{item.quantity}
@@ -92,9 +93,6 @@ const OrderBoard = () => {
           );
         })}
       </div>
-      {selectedItem && (
-        <ItemInfoModal item={selectedItem} onClose={() => setSelectedItem(null)} />
-      )}
     </div>
   );
 };

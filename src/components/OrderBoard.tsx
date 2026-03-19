@@ -25,8 +25,8 @@ const OrderBoard = () => {
       }
     }
 
-  // 진행도
   const doneCount = orders.filter(o => o.delivered).length;
+  const sortedOrders = [...orders].sort((a, b) => (a.delivered ? 1 : 0) - (b.delivered ? 1 : 0));
 
   return (
     <div className={styles.wrapper}>
@@ -37,7 +37,7 @@ const OrderBoard = () => {
         </div>
       </div>
       <div className={styles.board}>
-        {orders.map(order => {
+        {sortedOrders.map(order => {
           const deliverable = canDeliver(order.id);
           const diffClass = DIFF_CLASS[order.difficulty] || '';
           return (

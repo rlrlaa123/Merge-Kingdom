@@ -4,22 +4,29 @@
   "description": "왕국의 장인이 되어 주문을 이행하는 머지 퍼즐",
   "start_url": "/merge-kingdom/",
   "scope": "/merge-kingdom/",
+  "id": "/merge-kingdom/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#1a1a2e",
   "theme_color": "#1a1a2e",
   "icons": [
     {
+      "src": "/merge-kingdom/icon-144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
       "src": "/merge-kingdom/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "/merge-kingdom/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     }
   ]
 }

@@ -362,12 +362,10 @@ const useGameStore = create<GameStore>((set, get) => ({
       }
     }
 
-    // 에너지 환급 (Easy: 3, Medium: 7, Hard: 15)
-    const eRefund = order.difficulty === 'hard' ? 15 : order.difficulty === 'medium' ? 7 : 3;
-    const afterRefund = energy.current + eRefund;
+    // 레벨업 시 풀 충전, 그 외 에너지 변동 없음
     const newEnergyCurrent = newKL > kingdomLevel
-      ? Math.max(afterRefund, newEnergyCap)
-      : Math.min(afterRefund, Math.floor(newEnergyCap * OVERCHARGE_MULT));
+      ? Math.max(energy.current, newEnergyCap)
+      : energy.current;
 
     // 해당 주문을 delivered로 마킹
     let newOrders = orders.map(o => o.id === orderId ? { ...o, delivered: true } : o);
@@ -395,7 +393,7 @@ const useGameStore = create<GameStore>((set, get) => ({
       deliveryAnimation: { characterEmoji: order.characterEmoji, dialogue: thx },
     });
 
-    get().addFloatingText(`+${order.coinReward}🪙 +${order.fameReward}⭐ ⚡+${eRefund}`, 2, 0);
+    get().addFloatingText(`+${order.coinReward}🪙 +${order.fameReward}⭐`, 2, 0);
     if (get().ftueStep === 3) get().advanceFtue();
     return true;
   },

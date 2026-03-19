@@ -11,7 +11,6 @@ const OrderBoard = () => {
   const orders = useGameStore(s => s.orders);
   const canDeliver = useGameStore(s => s.canDeliver);
   const deliverOrder = useGameStore(s => s.deliverOrder);
-  const skipOrder = useGameStore(s => s.skipOrder);
   const board = useGameStore(s => s.board);
   const boardSize = useGameStore(s => s.boardSize);
 
@@ -20,61 +19,69 @@ const OrderBoard = () => {
   for (let r = 0; r < boardSize; r++)
     for (let c = 0; c < boardSize; c++) {
       const item = board[r]?.[c];
-      if (item) {
+      if (item && !item.special) {
         const key = `${item.chain}-${item.level}`;
         available[key] = (available[key] || 0) + 1;
       }
     }
 
-  // 납품 가능한 주문을 앞으로 정렬
-  const sortedOrders = [...orders].sort((a, b) => {
-    const aReady = canDeliver(a.id) ? 0 : 1;
-    const bReady = canDeliver(b.id) ? 0 : 1;
-    return aReady - bReady;
-  });
+  // 진행도
+  const doneCount = orders.filter(o => o.delivered).length;
 
   return (
-    <div className={styles.board}>
-      {sortedOrders.map(order => {
-        const deliverable = canDeliver(order.id);
-        const diffClass = DIFF_CLASS[order.difficulty] || '';
-        return (
-          <div key={order.id} className={`${styles.card} ${diffClass} ${deliverable ? styles.ready : ''}`}>
-            <div className={styles.header}>
-              <span className={styles.character}>{order.characterEmoji}</span>
-              <span className={styles.name}>{order.characterName}</span>
+    <div className={styles.wrapper}>
+      <div className={styles.progress}>
+        주문 {doneCount}/4
+        <div className={styles.progressBar}>
+          <div className={styles.progressFill} style={{ width: `${(doneCount / 4) * 100}%` }} />
+        </div>
+      </div>
+      <div className={styles.board}>
+        {orders.map(order => {
+          const deliverable = canDeliver(order.id);
+          const diffClass = DIFF_CLASS[order.difficulty] || '';
+          return (
+            <div
+              key={order.id}
+              className={`${styles.card} ${diffClass} ${deliverable ? styles.ready : ''} ${order.delivered ? styles.delivered : ''}`}
+            >
+              {order.delivered ? (
+                <div className={styles.doneOverlay}>✅</div>
+              ) : (
+                <>
+                  <div className={styles.header}>
+                    <span className={styles.character}>{order.characterEmoji}</span>
+                    <span className={styles.name}>{order.characterName}</span>
+                  </div>
+                  <div className={styles.dialogue}>"{order.dialogue}"</div>
+                  <div className={styles.items}>
+                    {order.items.map((item, i) => {
+                      const key = `${item.chain}-${item.level}`;
+                      const have = available[key] || 0;
+                      const met = have >= item.quantity;
+                      return (
+                        <span key={i} className={`${styles.req} ${met ? styles.met : ''}`}>
+                          {item.emoji}×{item.quantity}
+                        </span>
+                      );
+                    })}
+                  </div>
+                  <div className={styles.reward}>
+                    🪙{order.coinReward} ⭐{order.fameReward}
+                  </div>
+                  <button
+                    className={styles.deliverBtn}
+                    disabled={!deliverable}
+                    onClick={() => deliverOrder(order.id)}
+                  >
+                    납품
+                  </button>
+                </>
+              )}
             </div>
-            <div className={styles.dialogue}>"{order.dialogue}"</div>
-            <div className={styles.items}>
-              {order.items.map((item, i) => {
-                const key = `${item.chain}-${item.level}`;
-                const have = available[key] || 0;
-                const met = have >= item.quantity;
-                return (
-                  <span key={i} className={`${styles.req} ${met ? styles.met : ''}`}>
-                    {item.emoji}×{item.quantity}
-                  </span>
-                );
-              })}
-            </div>
-            <div className={styles.reward}>
-              🪙{order.coinReward} ⭐{order.fameReward}
-            </div>
-            <div className={styles.actions}>
-              <button
-                className={styles.deliverBtn}
-                disabled={!deliverable}
-                onClick={() => deliverOrder(order.id)}
-              >
-                납품
-              </button>
-              <button className={styles.skipBtn} onClick={() => skipOrder(order.id)}>
-                ↻
-              </button>
-            </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 };

@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { CHAINS, getChainItem, MAX_CHAIN_LEVEL } from '../data/chains';
 import { getKingdomLevel, getNextLevelDef } from '../data/levels';
 import { getCharacter } from '../data/characters';
-import { generateOrder, generateInitialOrders, gateDifficulty, SLOT_DIFFICULTIES, type Order } from '../engine/OrderManager';
+import { generateOrder, generateInitialOrders, generateOrderBatch, generateTutorialOrders, gateDifficulty, SLOT_DIFFICULTIES, type Order } from '../engine/OrderManager';
 import {
   getGeneratorCooldown, getGeneratorEnergyCost, getEnergyCap,
   ENERGY_REGEN_INTERVAL, FREE_GIFT_COOLDOWN, FREE_GIFT_MIN, FREE_GIFT_MAX,
@@ -257,7 +257,7 @@ const useGameStore = create<GameStore>((set, get) => ({
   canDeliver: (orderId) => {
     const { orders, board, boardSize } = get();
     const order = orders.find(o => o.id === orderId);
-    if (!order) return false;
+    if (!order || order.delivered) return false;
     const avail: Record<string, number> = {};
     for (let r = 0; r < boardSize; r++)
       for (let c = 0; c < boardSize; c++) {
@@ -278,8 +278,9 @@ const useGameStore = create<GameStore>((set, get) => ({
   deliverOrder: (orderId) => {
     const { orders, board, boardSize, completedOrderCount, unlockedChains, kingdomLevel, energy } = get();
     const order = orders.find(o => o.id === orderId);
-    if (!order || !get().canDeliver(orderId)) return false;
+    if (!order || order.delivered || !get().canDeliver(orderId)) return false;
 
+    // 보드에서 아이템 제거
     const nb = cloneBoard(board);
     for (const req of order.items) {
       let rem = req.quantity;
@@ -317,14 +318,18 @@ const useGameStore = create<GameStore>((set, get) => ({
 
     // 에너지 환급 (Easy: 3, Medium: 7, Hard: 15)
     const eRefund = order.difficulty === 'hard' ? 15 : order.difficulty === 'medium' ? 7 : 3;
-    // 레벨업 시 풀 충전
     const newEnergyCurrent = newKL > kingdomLevel
       ? newEnergyCap
       : Math.min(energy.current + eRefund, Math.floor(newEnergyCap * OVERCHARGE_MULT));
 
-    const gDiff = gateDifficulty(order.difficulty, newKL);
-    const newOrder = generateOrder(gDiff, newKL, newUnlocked, order.characterId);
-    const newOrders = orders.map(o => o.id === orderId ? newOrder : o);
+    // 해당 주문을 delivered로 마킹
+    let newOrders = orders.map(o => o.id === orderId ? { ...o, delivered: true } : o);
+
+    // 4개 모두 delivered면 새 배치 생성
+    const allDone = newOrders.every(o => o.delivered);
+    if (allDone) {
+      newOrders = generateOrderBatch(newKL, newUnlocked);
+    }
 
     const char = getCharacter(order.characterId);
     const thx = char?.thankDialogues[Math.floor(Math.random() * char.thankDialogues.length)] || '고마워!';
@@ -348,12 +353,8 @@ const useGameStore = create<GameStore>((set, get) => ({
     return true;
   },
 
-  skipOrder: (orderId) => {
-    const { orders, kingdomLevel, unlockedChains } = get();
-    const order = orders.find(o => o.id === orderId);
-    if (!order) return;
-    const newOrder = generateOrder(order.difficulty, kingdomLevel, unlockedChains, order.characterId);
-    set({ orders: orders.map(o => o.id === orderId ? newOrder : o) });
+  skipOrder: (_orderId) => {
+    // 배치 방식에서는 개별 스킵 불가 — 무시
   },
 
   trashItem: (r, c) => { const b = cloneBoard(get().board); b[r][c] = null; set({ board: b }); },

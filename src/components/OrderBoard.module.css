@@ -1,7 +1,38 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.progress {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 16px 0;
+  font-size: 0.65rem;
+  color: rgba(255,255,255,0.5);
+  font-weight: 600;
+}
+
+.progressBar {
+  flex: 1;
+  height: 4px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: linear-gradient(90deg, #2ecc71, #27ae60);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
 .board {
   display: flex;
   gap: 6px;
-  padding: 8px 12px;
+  padding: 4px 12px 8px;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
@@ -19,6 +50,7 @@
   gap: 3px;
   min-width: 130px;
   max-width: 160px;
+  position: relative;
 }
 
 .easy { border-color: rgba(46,204,113,0.4); }
@@ -31,23 +63,28 @@
   animation: readyPulse 1.5s ease-in-out infinite;
 }
 
+.card.delivered {
+  opacity: 0.4;
+  border-color: rgba(46,204,113,0.3);
+  background: rgba(46,204,113,0.05);
+}
+
+.doneOverlay {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  min-height: 60px;
+}
+
 @keyframes readyPulse {
   0%, 100% { box-shadow: 0 0 0 rgba(255,215,0,0); }
   50% { box-shadow: 0 0 12px rgba(255,215,0,0.3); }
 }
 
-.header {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
+.header { display: flex; align-items: center; gap: 4px; }
 .character { font-size: 1.1rem; }
-.name {
-  font-size: 0.7rem;
-  font-weight: 600;
-  color: rgba(255,255,255,0.8);
-}
+.name { font-size: 0.7rem; font-weight: 600; color: rgba(255,255,255,0.8); }
 
 .dialogue {
   font-size: 0.6rem;
@@ -59,11 +96,7 @@
   white-space: nowrap;
 }
 
-.items {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 3px;
-}
+.items { display: flex; flex-wrap: wrap; gap: 3px; }
 
 .req {
   display: inline-flex;
@@ -73,22 +106,11 @@
   border-radius: 6px;
   font-size: 0.75rem;
 }
-
 .req.met { background: rgba(46,204,113,0.15); }
 
-.reward {
-  font-size: 0.65rem;
-  color: #ffd700;
-  font-weight: 600;
-}
-
-.actions {
-  display: flex;
-  gap: 4px;
-}
+.reward { font-size: 0.65rem; color: #ffd700; font-weight: 600; }
 
 .deliverBtn {
-  flex: 1;
   padding: 6px;
   background: linear-gradient(135deg, #2ecc71, #27ae60);
   border: none;
@@ -98,19 +120,8 @@
   font-weight: 700;
   cursor: pointer;
 }
-
 .deliverBtn:disabled {
   background: rgba(255,255,255,0.08);
   color: rgba(255,255,255,0.3);
   cursor: not-allowed;
-}
-
-.skipBtn {
-  padding: 6px 10px;
-  background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 8px;
-  color: rgba(255,255,255,0.5);
-  font-size: 0.8rem;
-  cursor: pointer;
 }

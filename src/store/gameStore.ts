@@ -60,6 +60,37 @@ const getRandomEmptyCell = (b: (BoardItem | null)[][], s: number, maxRow?: numbe
   return cells.length ? cells[Math.floor(Math.random() * cells.length)] : null;
 };
 
+// 같은 체인 아이템 근처의 빈 셀 찾기
+const getNearbyEmptyCell = (
+  b: (BoardItem | null)[][], s: number, chainId: string, maxRow?: number
+): { r: number; c: number } | null => {
+  // 같은 체인 아이템 위치 수집
+  const rowLimit = maxRow !== undefined ? Math.min(maxRow, s) : s;
+  const sameChainCells: { r: number; c: number }[] = [];
+  for (let r = 0; r < rowLimit; r++)
+    for (let c = 0; c < s; c++)
+      if (b[r][c] && b[r][c]!.chain === chainId) sameChainCells.push({ r, c });
+
+  if (sameChainCells.length === 0) return getRandomEmptyCell(b, s, maxRow);
+
+  // 인접 빈 셀 수집 (거리 1 우선, 거리 2까지)
+  const emptyCells = findEmptyCells(b, s, maxRow);
+  if (emptyCells.length === 0) return null;
+
+  // 각 빈 셀의 가장 가까운 같은 체인까지 거리 계산
+  const scored = emptyCells.map(cell => {
+    const minDist = Math.min(...sameChainCells.map(sc =>
+      Math.abs(cell.r - sc.r) + Math.abs(cell.c - sc.c)
+    ));
+    return { ...cell, dist: minDist };
+  });
+
+  // 거리 1~2인 셀 우선, 없으면 전체에서 랜덤
+  const nearby = scored.filter(c => c.dist <= 2);
+  const pool = nearby.length > 0 ? nearby : scored;
+  return pool[Math.floor(Math.random() * pool.length)];
+};
+
 // 소스 업그레이드 스펙
 const SOURCE_SPECS = [
   { lv2Chance: 0, doubleProdChance: 0, upgradeCost: 0 },
@@ -161,7 +192,8 @@ const useGameStore = create<GameStore>((set, get) => ({
     if (energy.current < eCost) return false;
 
     const isTutorial = ftueStep > 0 && ftueStep <= 4;
-    const cell = getRandomEmptyCell(board, boardSize, isTutorial ? 2 : undefined);
+    const maxRow = isTutorial ? 2 : undefined;
+    const cell = getNearbyEmptyCell(board, boardSize, chainId, maxRow);
     if (!cell) return false;
 
     const spec = getSourceSpec(source.level);
@@ -170,10 +202,14 @@ const useGameStore = create<GameStore>((set, get) => ({
     const newBoard = cloneBoard(board);
     newBoard[cell.r][cell.c] = item;
 
+    let isDouble = false;
     // 더블 생산
     if (spec.doubleProdChance > 0 && Math.random() < spec.doubleProdChance) {
-      const c2 = getRandomEmptyCell(newBoard, boardSize);
-      if (c2) newBoard[c2.r][c2.c] = { id: uid(), chain: chainId, level: 1 };
+      const c2 = getNearbyEmptyCell(newBoard, boardSize, chainId, maxRow);
+      if (c2) {
+        newBoard[c2.r][c2.c] = { id: uid(), chain: chainId, level: 1 };
+        isDouble = true;
+      }
     }
 
     // 에너지 박스 드랍 (3% 확률)
@@ -187,7 +223,15 @@ const useGameStore = create<GameStore>((set, get) => ({
       energy: { ...energy, current: energy.current - eCost },
     });
 
-    get().addFloatingText(`⚡-${eCost}`, cell.c, cell.r);
+    // 특수효과
+    if (isDouble) {
+      get().addFloatingText('✨ 더블!', cell.c, cell.r);
+    } else if (itemLevel > 1) {
+      const ci = getChainItem(chainId, itemLevel);
+      get().addFloatingText(`⭐ ${ci?.emoji || ''} Lv${itemLevel}!`, cell.c, cell.r);
+    } else {
+      get().addFloatingText(`⚡-${eCost}`, cell.c, cell.r);
+    }
     if (get().ftueStep === 1) get().advanceFtue();
     return true;
   },

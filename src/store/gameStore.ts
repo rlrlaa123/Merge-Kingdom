@@ -362,9 +362,9 @@ const useGameStore = create<GameStore>((set, get) => ({
       }
     }
 
-    // 레벨업 시 풀 충전, 그 외 에너지 변동 없음
-    const newEnergyCurrent = newKL > kingdomLevel
-      ? Math.max(energy.current, newEnergyCap)
+    // 레벨업 시: max 미만이면 max까지 채움, max 이상이면 유지
+    const newEnergyCurrent = (newKL > kingdomLevel && energy.current < newEnergyCap)
+      ? newEnergyCap
       : energy.current;
 
     // 해당 주문을 delivered로 마킹

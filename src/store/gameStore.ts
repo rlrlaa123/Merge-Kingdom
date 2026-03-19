@@ -318,9 +318,10 @@ const useGameStore = create<GameStore>((set, get) => ({
 
     // 에너지 환급 (Easy: 3, Medium: 7, Hard: 15)
     const eRefund = order.difficulty === 'hard' ? 15 : order.difficulty === 'medium' ? 7 : 3;
+    const afterRefund = energy.current + eRefund;
     const newEnergyCurrent = newKL > kingdomLevel
-      ? newEnergyCap
-      : Math.min(energy.current + eRefund, Math.floor(newEnergyCap * OVERCHARGE_MULT));
+      ? Math.max(afterRefund, newEnergyCap)
+      : Math.min(afterRefund, Math.floor(newEnergyCap * OVERCHARGE_MULT));
 
     // 해당 주문을 delivered로 마킹
     let newOrders = orders.map(o => o.id === orderId ? { ...o, delivered: true } : o);

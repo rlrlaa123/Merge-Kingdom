@@ -1,48 +1,76 @@
 .bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 10px 16px;
+  padding: 8px 12px;
   background: rgba(255,255,255,0.05);
   border-bottom: 1px solid rgba(255,255,255,0.1);
+  gap: 10px;
+}
+
+.energySection { flex: 1; min-width: 0; }
+
+.energyText {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #4ade80;
+}
+
+.energyBar {
+  height: 6px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 2px;
+}
+
+.energyFill {
+  height: 100%;
+  background: linear-gradient(90deg, #4ade80, #22c55e);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.energyFill.energyLow {
+  background: linear-gradient(90deg, #ef4444, #dc2626);
+  animation: lowPulse 1s infinite;
+}
+
+@keyframes lowPulse {
+  0%,100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }
 
 .gold {
-  font-size: 1.2rem;
+  font-size: 0.9rem;
   font-weight: 700;
   color: #ffd700;
+  white-space: nowrap;
 }
 
 .level {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 
 .levelText {
-  font-size: 0.8rem;
+  font-size: 0.7rem;
   font-weight: 600;
   color: rgba(255,255,255,0.8);
   white-space: nowrap;
 }
 
 .fameBar {
-  width: 60px;
-  height: 5px;
+  width: 40px;
+  height: 4px;
   background: rgba(255,255,255,0.1);
-  border-radius: 3px;
+  border-radius: 2px;
   overflow: hidden;
 }
 
 .fameFill {
   height: 100%;
   background: linear-gradient(90deg, #ffd700, #ff9500);
-  border-radius: 3px;
+  border-radius: 2px;
   transition: width 0.3s ease;
-}
-
-.fameText {
-  font-size: 0.6rem;
-  color: rgba(255,255,255,0.5);
-  white-space: nowrap;
 }

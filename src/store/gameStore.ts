@@ -2,19 +2,35 @@ import { create } from 'zustand';
 import { CHAINS, getChainItem, MAX_CHAIN_LEVEL } from '../data/chains';
 import { getKingdomLevel, getNextLevelDef } from '../data/levels';
 import { getCharacter } from '../data/characters';
-import { generateOrder, generateInitialOrders, gateDifficulty, SLOT_DIFFICULTIES, type Order, type Difficulty } from '../engine/OrderManager';
+import { generateOrder, generateInitialOrders, gateDifficulty, SLOT_DIFFICULTIES, type Order } from '../engine/OrderManager';
+import {
+  getGeneratorCooldown, getGeneratorEnergyCost, getEnergyCap,
+  ENERGY_REGEN_INTERVAL, FREE_GIFT_COOLDOWN, FREE_GIFT_MIN, FREE_GIFT_MAX,
+  AD_ENERGY, MAX_ADS_PER_DAY, COIN_ENERGY_COST, COIN_ENERGY_AMOUNT,
+  OVERCHARGE_MULT, ENERGY_BOX_VALUES,
+} from '../data/generators';
 
 // === Types ===
 export interface BoardItem {
   id: string;
   chain: string;
   level: number;
+  special?: 'energyBox'; // 에너지 박스
 }
 
 export interface SourceState {
   chainId: string;
-  level: number;        // 소스 업그레이드 레벨 (1~3)
-  cooldownEnd: number;  // 쿨다운 종료 시각
+  level: number;
+  cooldownEnd: number;
+}
+
+export interface EnergyState {
+  current: number;
+  max: number;
+  lastRegenTime: number;
+  freeGiftClaimedAt: number | null;
+  adWatchCountToday: number;
+  lastAdResetDate: string;
 }
 
 export interface FloatingText {
@@ -28,64 +44,48 @@ export interface FloatingText {
 const uid = () => Date.now().toString(36) + Math.random().toString(36).substr(2);
 const BOARD_SIZE = 5;
 const SAVE_KEY = 'mk-rebirth-save';
-// 소스 업그레이드 스펙
-const SOURCE_SPECS = [
-  { cooldown: 15_000, lv2Chance: 0,    doubleProdChance: 0,    upgradeCost: 0 },    // Lv1
-  { cooldown: 10_000, lv2Chance: 0.20, doubleProdChance: 0,    upgradeCost: 100 },  // Lv2
-  { cooldown: 7_000,  lv2Chance: 0.35, doubleProdChance: 0.10, upgradeCost: 500 },  // Lv3
-];
-const getSourceSpec = (level: number) => SOURCE_SPECS[Math.min(level - 1, 2)];
-
-// 보드 확장 비용
-const BOARD_EXPAND_COST: Record<number, number> = { 6: 500, 7: 2000 };
+const today = () => new Date().toISOString().slice(0, 10);
 
 const createEmptyBoard = (size: number): (BoardItem | null)[][] =>
   Array(size).fill(null).map(() => Array(size).fill(null));
-
-const cloneBoard = (board: (BoardItem | null)[][]): (BoardItem | null)[][] =>
-  board.map(row => [...row]);
-
-const findEmptyCells = (board: (BoardItem | null)[][], size: number): { r: number; c: number }[] => {
+const cloneBoard = (b: (BoardItem | null)[][]) => b.map(r => [...r]);
+const findEmptyCells = (b: (BoardItem | null)[][], s: number) => {
   const cells: { r: number; c: number }[] = [];
-  for (let r = 0; r < size; r++)
-    for (let c = 0; c < size; c++)
-      if (!board[r][c]) cells.push({ r, c });
+  for (let r = 0; r < s; r++) for (let c = 0; c < s; c++) if (!b[r][c]) cells.push({ r, c });
   return cells;
 };
-
-const getRandomEmptyCell = (board: (BoardItem | null)[][], size: number) => {
-  const cells = findEmptyCells(board, size);
-  return cells.length > 0 ? cells[Math.floor(Math.random() * cells.length)] : null;
+const getRandomEmptyCell = (b: (BoardItem | null)[][], s: number) => {
+  const cells = findEmptyCells(b, s);
+  return cells.length ? cells[Math.floor(Math.random() * cells.length)] : null;
 };
 
-// === Store ===
+// 소스 업그레이드 스펙
+const SOURCE_SPECS = [
+  { lv2Chance: 0, doubleProdChance: 0, upgradeCost: 0 },
+  { lv2Chance: 0.20, doubleProdChance: 0, upgradeCost: 100 },
+  { lv2Chance: 0.35, doubleProdChance: 0.10, upgradeCost: 500 },
+];
+const getSourceSpec = (lv: number) => SOURCE_SPECS[Math.min(lv - 1, 2)];
+
+const BOARD_EXPAND_COST: Record<number, number> = { 6: 500, 7: 2000 };
+
+// === Store Interface ===
 interface GameStore {
-  // Board
   board: (BoardItem | null)[][];
   boardSize: number;
-
-  // Sources
   sources: SourceState[];
-
-  // Orders
   orders: Order[];
   completedOrderCount: number;
-
-  // Economy
   gold: number;
   fame: number;
   kingdomLevel: number;
-
-  // Progression
   unlockedChains: string[];
-
-  // UI
+  energy: EnergyState;
   floatingTexts: FloatingText[];
   levelUpMessage: string | null;
   deliveryAnimation: { characterEmoji: string; dialogue: string } | null;
-
-  // Meta
   lastPlayedAt: number;
+  ftueStep: number;
 
   // Actions
   tapSource: (chainId: string) => boolean;
@@ -96,26 +96,39 @@ interface GameStore {
   canDeliver: (orderId: string) => boolean;
   skipOrder: (orderId: string) => void;
   trashItem: (r: number, c: number) => void;
+  tapEnergyBox: (r: number, c: number) => boolean;
   upgradeSource: (chainId: string) => boolean;
   getSourceUpgradeCost: (chainId: string) => number;
   expandBoard: () => boolean;
   getExpandCost: () => number | null;
-  tickSources: () => void;
+  // Energy
+  tickEnergy: () => void;
+  claimFreeGift: () => boolean;
+  canClaimFreeGift: () => boolean;
+  getFreeGiftCooldown: () => number;
+  watchAd: () => boolean;
+  buyEnergy: () => boolean;
+  // UI
   addFloatingText: (text: string, x: number, y: number) => void;
   clearLevelUp: () => void;
   clearDelivery: () => void;
+  advanceFtue: () => void;
+  // Save
   save: () => void;
   load: () => void;
   resetGame: () => void;
   isSourceReady: (chainId: string) => boolean;
   getSourceCooldownRemaining: (chainId: string) => number;
-  getAvailableSources: () => SourceState[];
-  getIncomePerOrder: () => { easy: number; medium: number; hard: number };
-
-  // FTUE
-  ftueStep: number; // 0=done, 1~5=tutorial steps
-  advanceFtue: () => void;
 }
+
+const initialEnergy = (): EnergyState => ({
+  current: 85,
+  max: 85,
+  lastRegenTime: Date.now(),
+  freeGiftClaimedAt: null,
+  adWatchCountToday: 0,
+  lastAdResetDate: today(),
+});
 
 const useGameStore = create<GameStore>((set, get) => ({
   board: createEmptyBoard(BOARD_SIZE),
@@ -130,43 +143,55 @@ const useGameStore = create<GameStore>((set, get) => ({
   fame: 0,
   kingdomLevel: 1,
   unlockedChains: ['wood', 'stone'],
+  energy: initialEnergy(),
   floatingTexts: [],
   levelUpMessage: null,
   deliveryAnimation: null,
   lastPlayedAt: Date.now(),
-  ftueStep: -1, // -1 = not initialized, will be set in load()
+  ftueStep: -1,
 
-  // === 소스 탭 ===
+  // === 소스 탭 (에너지 소모) ===
   tapSource: (chainId) => {
-    const { board, boardSize, sources } = get();
+    const { board, boardSize, sources, energy } = get();
     const source = sources.find(s => s.chainId === chainId);
     if (!source || Date.now() < source.cooldownEnd) return false;
 
-    const spec = getSourceSpec(source.level);
+    const eCost = getGeneratorEnergyCost(chainId);
+    if (energy.current < eCost) return false;
+
     const cell = getRandomEmptyCell(board, boardSize);
     if (!cell) return false;
 
-    // Lv2 확률로 상위 아이템 생산
+    const spec = getSourceSpec(source.level);
     const itemLevel = Math.random() < spec.lv2Chance ? 2 : 1;
     const item: BoardItem = { id: uid(), chain: chainId, level: itemLevel };
     const newBoard = cloneBoard(board);
     newBoard[cell.r][cell.c] = item;
 
-    // 더블 생산 (Lv3 소스)
+    // 더블 생산
     if (spec.doubleProdChance > 0 && Math.random() < spec.doubleProdChance) {
-      const cell2 = getRandomEmptyCell(newBoard, boardSize);
-      if (cell2) {
-        newBoard[cell2.r][cell2.c] = { id: uid(), chain: chainId, level: 1 };
-      }
+      const c2 = getRandomEmptyCell(newBoard, boardSize);
+      if (c2) newBoard[c2.r][c2.c] = { id: uid(), chain: chainId, level: 1 };
     }
 
+    // 에너지 박스 드랍 (3% 확률)
+    if (Math.random() < 0.03) {
+      const c3 = getRandomEmptyCell(newBoard, boardSize);
+      if (c3) newBoard[c3.r][c3.c] = { id: uid(), chain: 'energyBox', level: 1, special: 'energyBox' };
+    }
+
+    const cooldown = getGeneratorCooldown(chainId, source.level);
     const newSources = sources.map(s =>
-      s.chainId === chainId ? { ...s, cooldownEnd: Date.now() + spec.cooldown } : s
+      s.chainId === chainId ? { ...s, cooldownEnd: Date.now() + cooldown } : s
     );
 
-    set({ board: newBoard, sources: newSources });
+    set({
+      board: newBoard,
+      sources: newSources,
+      energy: { ...energy, current: energy.current - eCost },
+    });
 
-    // FTUE: 소스 탭 후 다음 단계
+    get().addFloatingText(`⚡-${eCost}`, cell.c, cell.r);
     if (get().ftueStep === 1) get().advanceFtue();
     return true;
   },
@@ -177,36 +202,61 @@ const useGameStore = create<GameStore>((set, get) => ({
     const from = board[fromR]?.[fromC];
     const to = board[toR]?.[toC];
     if (!from || !to) return false;
+
+    // 에너지 박스 머지
+    if (from.special === 'energyBox' && to.special === 'energyBox' && from.level === to.level) {
+      if (from.level >= 3) return false;
+      const merged: BoardItem = { id: uid(), chain: 'energyBox', level: from.level + 1, special: 'energyBox' };
+      const nb = cloneBoard(board);
+      nb[fromR][fromC] = null;
+      nb[toR][toC] = merged;
+      set({ board: nb });
+      return true;
+    }
+
+    // 일반 머지
     if (from.chain !== to.chain || from.level !== to.level) return false;
+    if (from.special || to.special) return false;
     if (from.level >= MAX_CHAIN_LEVEL) return false;
 
     const newLevel = from.level + 1;
     const merged: BoardItem = { id: uid(), chain: from.chain, level: newLevel };
-    const newBoard = cloneBoard(board);
-    newBoard[fromR][fromC] = null;
-    newBoard[toR][toC] = merged;
+    const nb = cloneBoard(board);
+    nb[fromR][fromC] = null;
+    nb[toR][toC] = merged;
+    set({ board: nb });
 
-    const chainItem = getChainItem(from.chain, newLevel);
-    set({ board: newBoard });
-
-    if (chainItem) {
-      get().addFloatingText(`${chainItem.emoji} ${chainItem.name}!`, toC, toR);
-    }
+    const ci = getChainItem(from.chain, newLevel);
+    if (ci) get().addFloatingText(`${ci.emoji} ${ci.name}!`, toC, toR);
     if (get().ftueStep === 2) get().advanceFtue();
     return true;
   },
 
-  swapItems: (fromR, fromC, toR, toC) => {
+  swapItems: (fR, fC, tR, tC) => {
     const b = cloneBoard(get().board);
-    [b[fromR][fromC], b[toR][toC]] = [b[toR][toC], b[fromR][fromC]];
+    [b[fR][fC], b[tR][tC]] = [b[tR][tC], b[fR][fC]];
     set({ board: b });
   },
 
-  moveItem: (fromR, fromC, toR, toC) => {
+  moveItem: (fR, fC, tR, tC) => {
     const b = cloneBoard(get().board);
-    b[toR][toC] = b[fromR][fromC];
-    b[fromR][fromC] = null;
+    b[tR][tC] = b[fR][fC]; b[fR][fC] = null;
     set({ board: b });
+  },
+
+  // === 에너지 박스 탭 ===
+  tapEnergyBox: (r, c) => {
+    const { board, energy } = get();
+    const item = board[r]?.[c];
+    if (!item || item.special !== 'energyBox') return false;
+    const amount = ENERGY_BOX_VALUES[item.level - 1] || 10;
+    const maxOvercharge = Math.floor(energy.max * OVERCHARGE_MULT);
+    const newEnergy = Math.min(energy.current + amount, maxOvercharge);
+    const nb = cloneBoard(board);
+    nb[r][c] = null;
+    set({ board: nb, energy: { ...energy, current: newEnergy } });
+    get().addFloatingText(`⚡+${amount}`, c, r);
+    return true;
   },
 
   // === 주문 ===
@@ -214,93 +264,92 @@ const useGameStore = create<GameStore>((set, get) => ({
     const { orders, board, boardSize } = get();
     const order = orders.find(o => o.id === orderId);
     if (!order) return false;
-
-    const available: Record<string, number> = {};
+    const avail: Record<string, number> = {};
     for (let r = 0; r < boardSize; r++)
       for (let c = 0; c < boardSize; c++) {
-        const item = board[r]?.[c];
-        if (item) {
-          const key = `${item.chain}-${item.level}`;
-          available[key] = (available[key] || 0) + 1;
+        const it = board[r]?.[c];
+        if (it && !it.special) {
+          const k = `${it.chain}-${it.level}`;
+          avail[k] = (avail[k] || 0) + 1;
         }
       }
-
     for (const req of order.items) {
-      const key = `${req.chain}-${req.level}`;
-      if ((available[key] || 0) < req.quantity) return false;
-      available[key] -= req.quantity;
+      const k = `${req.chain}-${req.level}`;
+      if ((avail[k] || 0) < req.quantity) return false;
+      avail[k] -= req.quantity;
     }
     return true;
   },
 
   deliverOrder: (orderId) => {
-    const { orders, board, boardSize, completedOrderCount, unlockedChains, kingdomLevel } = get();
+    const { orders, board, boardSize, completedOrderCount, unlockedChains, kingdomLevel, energy } = get();
     const order = orders.find(o => o.id === orderId);
     if (!order || !get().canDeliver(orderId)) return false;
 
-    const newBoard = cloneBoard(board);
+    const nb = cloneBoard(board);
     for (const req of order.items) {
-      let remaining = req.quantity;
-      for (let r = 0; r < boardSize && remaining > 0; r++)
-        for (let c = 0; c < boardSize && remaining > 0; c++) {
-          const item = newBoard[r]?.[c];
-          if (item && item.chain === req.chain && item.level === req.level) {
-            newBoard[r][c] = null;
-            remaining--;
+      let rem = req.quantity;
+      for (let r = 0; r < boardSize && rem > 0; r++)
+        for (let c = 0; c < boardSize && rem > 0; c++) {
+          const it = nb[r]?.[c];
+          if (it && !it.special && it.chain === req.chain && it.level === req.level) {
+            nb[r][c] = null; rem--;
           }
         }
     }
 
     const newCount = completedOrderCount + 1;
     const newFame = get().fame + order.fameReward;
-    const newKingdomLevel = getKingdomLevel(newFame);
+    const newKL = getKingdomLevel(newFame);
 
-    // 해금 체크
-    let newUnlockedChains = [...unlockedChains];
-    let levelUpMsg: string | null = null;
-    if (newKingdomLevel > kingdomLevel) {
-      const nextDef = getNextLevelDef(kingdomLevel);
-      levelUpMsg = nextDef ? `⭐ Lv.${newKingdomLevel}! ${nextDef.unlocks.join(', ')}` : `⭐ Lv.${newKingdomLevel}!`;
-
-      // 체인 해금
-      for (const chain of CHAINS) {
-        if (chain.unlockLevel <= newKingdomLevel && !newUnlockedChains.includes(chain.id)) {
-          newUnlockedChains.push(chain.id);
-        }
+    let newUnlocked = [...unlockedChains];
+    let lvMsg: string | null = null;
+    let newEnergyCap = energy.max;
+    if (newKL > kingdomLevel) {
+      const nd = getNextLevelDef(kingdomLevel);
+      lvMsg = nd ? `⭐ Lv.${newKL}! ${nd.unlocks.join(', ')}` : `⭐ Lv.${newKL}!`;
+      for (const ch of CHAINS) {
+        if (ch.unlockLevel <= newKL && !newUnlocked.includes(ch.id)) newUnlocked.push(ch.id);
       }
+      newEnergyCap = getEnergyCap(newKL);
     }
 
-    // 새 소스 해금
     let newSources = [...get().sources];
-    for (const chain of CHAINS) {
-      if (chain.unlockLevel <= newKingdomLevel && !newSources.find(s => s.chainId === chain.id)) {
-        newSources.push({ chainId: chain.id, level: 1, cooldownEnd: 0 });
+    for (const ch of CHAINS) {
+      if (ch.unlockLevel <= newKL && !newSources.find(s => s.chainId === ch.id)) {
+        newSources.push({ chainId: ch.id, level: 1, cooldownEnd: 0 });
       }
     }
 
-    // 즉시 같은 난이도 새 주문 (Hard 게이팅 적용)
-    const gatedDiff = gateDifficulty(order.difficulty, newKingdomLevel);
-    const newOrder = generateOrder(gatedDiff, newKingdomLevel, newUnlockedChains, order.characterId);
+    // 에너지 환급 (Easy: 3, Medium: 7, Hard: 15)
+    const eRefund = order.difficulty === 'hard' ? 15 : order.difficulty === 'medium' ? 7 : 3;
+    // 레벨업 시 풀 충전
+    const newEnergyCurrent = newKL > kingdomLevel
+      ? newEnergyCap
+      : Math.min(energy.current + eRefund, Math.floor(newEnergyCap * OVERCHARGE_MULT));
+
+    const gDiff = gateDifficulty(order.difficulty, newKL);
+    const newOrder = generateOrder(gDiff, newKL, newUnlocked, order.characterId);
     const newOrders = orders.map(o => o.id === orderId ? newOrder : o);
 
-    // 캐릭터 감사 대사
     const char = getCharacter(order.characterId);
-    const thankDialogue = char?.thankDialogues[Math.floor(Math.random() * (char.thankDialogues.length || 1))] || '고마워!';
+    const thx = char?.thankDialogues[Math.floor(Math.random() * char.thankDialogues.length)] || '고마워!';
 
     set({
-      board: newBoard,
+      board: nb,
       gold: get().gold + order.coinReward,
       fame: newFame,
-      kingdomLevel: newKingdomLevel,
+      kingdomLevel: newKL,
       orders: newOrders,
       completedOrderCount: newCount,
-      unlockedChains: newUnlockedChains,
+      unlockedChains: newUnlocked,
       sources: newSources,
-      levelUpMessage: levelUpMsg,
-      deliveryAnimation: { characterEmoji: order.characterEmoji, dialogue: thankDialogue },
+      energy: { ...energy, current: newEnergyCurrent, max: newEnergyCap },
+      levelUpMessage: lvMsg,
+      deliveryAnimation: { characterEmoji: order.characterEmoji, dialogue: thx },
     });
 
-    get().addFloatingText(`+${order.coinReward} 🪙 +${order.fameReward} ⭐`, 2, 0);
+    get().addFloatingText(`+${order.coinReward}🪙 +${order.fameReward}⭐ ⚡+${eRefund}`, 2, 0);
     if (get().ftueStep === 3) get().advanceFtue();
     return true;
   },
@@ -313,69 +362,107 @@ const useGameStore = create<GameStore>((set, get) => ({
     set({ orders: orders.map(o => o.id === orderId ? newOrder : o) });
   },
 
-  trashItem: (r, c) => {
-    const b = cloneBoard(get().board);
-    b[r][c] = null;
-    set({ board: b });
-  },
+  trashItem: (r, c) => { const b = cloneBoard(get().board); b[r][c] = null; set({ board: b }); },
 
   // === 소스 업그레이드 ===
   upgradeSource: (chainId) => {
     const { sources, gold } = get();
-    const source = sources.find(s => s.chainId === chainId);
-    if (!source || source.level >= 3) return false;
-    const nextSpec = getSourceSpec(source.level + 1);
-    if (gold < nextSpec.upgradeCost) return false;
-    const newSources = sources.map(s =>
-      s.chainId === chainId ? { ...s, level: s.level + 1 } : s
-    );
-    set({ sources: newSources, gold: gold - nextSpec.upgradeCost });
+    const src = sources.find(s => s.chainId === chainId);
+    if (!src || src.level >= 3) return false;
+    const cost = getSourceSpec(src.level + 1).upgradeCost;
+    if (gold < cost) return false;
+    set({ sources: sources.map(s => s.chainId === chainId ? { ...s, level: s.level + 1 } : s), gold: gold - cost });
     return true;
   },
-
   getSourceUpgradeCost: (chainId) => {
-    const source = get().sources.find(s => s.chainId === chainId);
-    if (!source || source.level >= 3) return 0;
-    return getSourceSpec(source.level + 1).upgradeCost;
+    const src = get().sources.find(s => s.chainId === chainId);
+    if (!src || src.level >= 3) return 0;
+    return getSourceSpec(src.level + 1).upgradeCost;
   },
 
   // === 보드 확장 ===
   expandBoard: () => {
     const { board, boardSize, gold, kingdomLevel } = get();
-    const newSize = boardSize + 1;
-    const cost = BOARD_EXPAND_COST[newSize];
+    const ns = boardSize + 1;
+    const cost = BOARD_EXPAND_COST[ns];
     if (!cost || gold < cost) return false;
-    // Kingdom Lv.5 → 6×6, Lv.9 → 7×7
-    if (newSize === 6 && kingdomLevel < 5) return false;
-    if (newSize === 7 && kingdomLevel < 9) return false;
-    const newBoard = Array(newSize).fill(null).map((_, r) =>
-      Array(newSize).fill(null).map((_, c) => (r < boardSize && c < boardSize ? board[r]?.[c] : null))
-    );
-    set({ board: newBoard, boardSize: newSize, gold: gold - cost });
+    if (ns === 6 && kingdomLevel < 5) return false;
+    if (ns === 7 && kingdomLevel < 9) return false;
+    const nb = Array(ns).fill(null).map((_, r) => Array(ns).fill(null).map((_, c) => (r < boardSize && c < boardSize ? board[r]?.[c] : null)));
+    set({ board: nb, boardSize: ns, gold: gold - cost });
     return true;
   },
-
   getExpandCost: () => {
     const { boardSize, kingdomLevel } = get();
-    const nextSize = boardSize + 1;
-    if (nextSize === 6 && kingdomLevel >= 5) return BOARD_EXPAND_COST[6];
-    if (nextSize === 7 && kingdomLevel >= 9) return BOARD_EXPAND_COST[7];
+    const ns = boardSize + 1;
+    if (ns === 6 && kingdomLevel >= 5) return BOARD_EXPAND_COST[6];
+    if (ns === 7 && kingdomLevel >= 9) return BOARD_EXPAND_COST[7];
     return null;
   },
 
-  // === FTUE ===
-  advanceFtue: () => {
-    const { ftueStep } = get();
-    const next = ftueStep >= 4 ? 0 : ftueStep + 1;
-    set({ ftueStep: next });
+  // === 에너지 시스템 ===
+  tickEnergy: () => {
+    const { energy } = get();
+    const now = Date.now();
+    if (energy.current >= energy.max) {
+      set({ energy: { ...energy, lastRegenTime: now } });
+      return;
+    }
+    const elapsed = now - energy.lastRegenTime;
+    const regens = Math.floor(elapsed / ENERGY_REGEN_INTERVAL);
+    if (regens > 0) {
+      const newCurrent = Math.min(energy.current + regens, energy.max);
+      set({ energy: { ...energy, current: newCurrent, lastRegenTime: energy.lastRegenTime + regens * ENERGY_REGEN_INTERVAL } });
+    }
   },
 
-  // === Tick ===
-  tickSources: () => {
-    // 소스 쿨다운은 timestamp 기반이므로 별도 tick 불필요
-    // UI 갱신을 위한 dummy set
-    set({});
+  canClaimFreeGift: () => {
+    const { energy } = get();
+    if (!energy.freeGiftClaimedAt) return true;
+    return Date.now() - energy.freeGiftClaimedAt >= FREE_GIFT_COOLDOWN;
   },
+
+  getFreeGiftCooldown: () => {
+    const { energy } = get();
+    if (!energy.freeGiftClaimedAt) return 0;
+    const remaining = FREE_GIFT_COOLDOWN - (Date.now() - energy.freeGiftClaimedAt);
+    return Math.max(0, Math.ceil(remaining / 1000));
+  },
+
+  claimFreeGift: () => {
+    if (!get().canClaimFreeGift()) return false;
+    const { energy } = get();
+    const amount = FREE_GIFT_MIN + Math.floor(Math.random() * (FREE_GIFT_MAX - FREE_GIFT_MIN + 1));
+    const maxOC = Math.floor(energy.max * OVERCHARGE_MULT);
+    set({ energy: { ...energy, current: Math.min(energy.current + amount, maxOC), freeGiftClaimedAt: Date.now() } });
+    get().addFloatingText(`🎁 ⚡+${amount}`, 2, 2);
+    return true;
+  },
+
+  watchAd: () => {
+    const { energy } = get();
+    let e = { ...energy };
+    if (e.lastAdResetDate !== today()) { e.adWatchCountToday = 0; e.lastAdResetDate = today(); }
+    if (e.adWatchCountToday >= MAX_ADS_PER_DAY) return false;
+    const maxOC = Math.floor(e.max * OVERCHARGE_MULT);
+    e.current = Math.min(e.current + AD_ENERGY, maxOC);
+    e.adWatchCountToday += 1;
+    set({ energy: e });
+    get().addFloatingText(`🎬 ⚡+${AD_ENERGY}`, 2, 2);
+    return true;
+  },
+
+  buyEnergy: () => {
+    const { gold, energy } = get();
+    if (gold < COIN_ENERGY_COST) return false;
+    const maxOC = Math.floor(energy.max * OVERCHARGE_MULT);
+    set({ gold: gold - COIN_ENERGY_COST, energy: { ...energy, current: Math.min(energy.current + COIN_ENERGY_AMOUNT, maxOC) } });
+    get().addFloatingText(`⚡+${COIN_ENERGY_AMOUNT}`, 2, 2);
+    return true;
+  },
+
+  // === FTUE ===
+  advanceFtue: () => set(s => ({ ftueStep: s.ftueStep >= 4 ? 0 : s.ftueStep + 1 })),
 
   // === UI ===
   addFloatingText: (text, x, y) => {
@@ -383,110 +470,97 @@ const useGameStore = create<GameStore>((set, get) => ({
     set(s => ({ floatingTexts: [...s.floatingTexts, { id, text, x, y }] }));
     setTimeout(() => set(s => ({ floatingTexts: s.floatingTexts.filter(t => t.id !== id) })), 1500);
   },
-
   clearLevelUp: () => set({ levelUpMessage: null }),
   clearDelivery: () => set({ deliveryAnimation: null }),
 
   isSourceReady: (chainId) => {
-    const source = get().sources.find(s => s.chainId === chainId);
-    return !!source && Date.now() >= source.cooldownEnd;
+    const s = get().sources.find(s => s.chainId === chainId);
+    return !!s && Date.now() >= s.cooldownEnd;
   },
-
   getSourceCooldownRemaining: (chainId) => {
-    const source = get().sources.find(s => s.chainId === chainId);
-    if (!source) return 0;
-    return Math.max(0, Math.ceil((source.cooldownEnd - Date.now()) / 1000));
+    const s = get().sources.find(s => s.chainId === chainId);
+    if (!s) return 0;
+    return Math.max(0, Math.ceil((s.cooldownEnd - Date.now()) / 1000));
   },
-
-  getAvailableSources: () => get().sources,
-
-  getIncomePerOrder: () => ({ easy: 10, medium: 25, hard: 60 }),
 
   // === Save/Load ===
   save: () => {
     const s = get();
     localStorage.setItem(SAVE_KEY, JSON.stringify({
-      board: s.board,
-      boardSize: s.boardSize,
-      sources: s.sources,
-      orders: s.orders,
-      completedOrderCount: s.completedOrderCount,
-      gold: s.gold,
-      fame: s.fame,
-      kingdomLevel: s.kingdomLevel,
-      unlockedChains: s.unlockedChains,
-      ftueStep: s.ftueStep,
-      lastPlayedAt: Date.now(),
+      board: s.board, boardSize: s.boardSize, sources: s.sources,
+      orders: s.orders, completedOrderCount: s.completedOrderCount,
+      gold: s.gold, fame: s.fame, kingdomLevel: s.kingdomLevel,
+      unlockedChains: s.unlockedChains, energy: s.energy,
+      ftueStep: s.ftueStep, lastPlayedAt: Date.now(),
     }));
   },
 
   load: () => {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) {
-      // 첫 시작: FTUE + 초기 주문
       const { kingdomLevel, unlockedChains } = get();
       set({ orders: generateInitialOrders(kingdomLevel, unlockedChains), ftueStep: 1 });
       return;
     }
     try {
       const d = JSON.parse(raw);
+      const e: EnergyState = d.energy || initialEnergy();
+
+      // 오프라인 에너지 회복
+      if (e.lastRegenTime) {
+        const elapsed = Date.now() - e.lastRegenTime;
+        const regens = Math.floor(elapsed / ENERGY_REGEN_INTERVAL);
+        if (regens > 0 && e.current < e.max) {
+          e.current = Math.min(e.current + regens, e.max);
+          e.lastRegenTime += regens * ENERGY_REGEN_INTERVAL;
+        }
+      }
+      // 광고 일일 리셋
+      if (e.lastAdResetDate !== today()) { e.adWatchCountToday = 0; e.lastAdResetDate = today(); }
+
       set({
         board: d.board || createEmptyBoard(BOARD_SIZE),
         boardSize: d.boardSize || BOARD_SIZE,
         sources: d.sources || get().sources,
         orders: d.orders || [],
         completedOrderCount: d.completedOrderCount || 0,
-        gold: d.gold || 0,
-        fame: d.fame || 0,
+        gold: d.gold || 0, fame: d.fame || 0,
         kingdomLevel: d.kingdomLevel || 1,
         unlockedChains: d.unlockedChains || ['wood', 'stone'],
-        ftueStep: d.ftueStep ?? 0,
+        energy: e, ftueStep: d.ftueStep ?? 0,
         lastPlayedAt: d.lastPlayedAt || Date.now(),
       });
 
-      // 빈 주문 슬롯 채우기
+      // 빈 주문 채우기
       const { kingdomLevel: kl, unlockedChains: uc, orders } = get();
       if (orders.length < 4) {
-        const newOrders = [...orders];
-        while (newOrders.length < 4) {
-          const diff = SLOT_DIFFICULTIES[newOrders.length];
-          newOrders.push(generateOrder(diff, kl, uc));
-        }
-        set({ orders: newOrders });
+        const no = [...orders];
+        while (no.length < 4) { no.push(generateOrder(SLOT_DIFFICULTIES[no.length], kl, uc)); }
+        set({ orders: no });
       }
 
-      // 오프라인 보상
+      // 오프라인 코인 보상
       if (d.lastPlayedAt) {
-        const elapsed = Math.min((Date.now() - d.lastPlayedAt) / 1000, 8 * 3600);
-        const offlineGold = Math.min(300, Math.floor(elapsed / 60 * 0.5));
-        if (offlineGold > 0) {
-          set(s => ({ gold: s.gold + offlineGold }));
-          setTimeout(() => get().addFloatingText(`오프라인 보상: +${offlineGold} 🪙`, 2, 2), 500);
+        const el = Math.min((Date.now() - d.lastPlayedAt) / 1000, 8 * 3600);
+        const offGold = Math.min(300, Math.floor(el / 60 * 0.5));
+        if (offGold > 0) {
+          set(s => ({ gold: s.gold + offGold }));
+          setTimeout(() => get().addFloatingText(`오프라인: +${offGold}🪙`, 2, 2), 500);
         }
       }
-    } catch { /* corrupt save */ }
+    } catch { /* corrupt */ }
   },
 
   resetGame: () => {
     localStorage.removeItem(SAVE_KEY);
-    const orders = generateInitialOrders(1, ['wood', 'stone']);
     set({
-      board: createEmptyBoard(BOARD_SIZE),
-      boardSize: BOARD_SIZE,
-      sources: [
-        { chainId: 'wood', level: 1, cooldownEnd: 0 },
-        { chainId: 'stone', level: 1, cooldownEnd: 0 },
-      ],
-      orders,
-      completedOrderCount: 0,
-      gold: 0,
-      fame: 0,
-      kingdomLevel: 1,
-      unlockedChains: ['wood', 'stone'],
-      floatingTexts: [],
-      levelUpMessage: null,
-      deliveryAnimation: null,
-      lastPlayedAt: Date.now(),
+      board: createEmptyBoard(BOARD_SIZE), boardSize: BOARD_SIZE,
+      sources: [{ chainId: 'wood', level: 1, cooldownEnd: 0 }, { chainId: 'stone', level: 1, cooldownEnd: 0 }],
+      orders: generateInitialOrders(1, ['wood', 'stone']),
+      completedOrderCount: 0, gold: 0, fame: 0, kingdomLevel: 1,
+      unlockedChains: ['wood', 'stone'], energy: initialEnergy(),
+      floatingTexts: [], levelUpMessage: null, deliveryAnimation: null,
+      lastPlayedAt: Date.now(), ftueStep: 1,
     });
   },
 }));

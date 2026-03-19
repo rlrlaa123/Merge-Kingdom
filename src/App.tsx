@@ -6,27 +6,25 @@ import Board from './components/Board';
 import BottomBar from './components/BottomBar';
 import FloatingTexts from './components/FloatingTexts';
 import FtueOverlay from './components/FtueOverlay';
+import EnergyModal from './components/EnergyModal';
 import useGameStore from './store/gameStore';
 import './styles/global.css';
 
 function App() {
   const load = useGameStore(s => s.load);
   const save = useGameStore(s => s.save);
+  const tickEnergy = useGameStore(s => s.tickEnergy);
 
   useEffect(() => { load(); }, [load]);
-
   useEffect(() => {
-    const id = setInterval(save, 30_000);
+    const id = setInterval(() => { tickEnergy(); save(); }, 5_000);
     return () => clearInterval(id);
-  }, [save]);
-
+  }, [save, tickEnergy]);
   useEffect(() => {
-    const handleUnload = () => save();
-    window.addEventListener('beforeunload', handleUnload);
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'hidden') save();
-    });
-    return () => window.removeEventListener('beforeunload', handleUnload);
+    const h = () => save();
+    window.addEventListener('beforeunload', h);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') save(); });
+    return () => window.removeEventListener('beforeunload', h);
   }, [save]);
 
   return (
@@ -40,6 +38,7 @@ function App() {
       <BottomBar />
       <FloatingTexts />
       <FtueOverlay />
+      <EnergyModal />
     </div>
   );
 }

@@ -17,7 +17,7 @@ const Board = () => {
   const swapItems = useGameStore(s => s.swapItems);
   const moveItem = useGameStore(s => s.moveItem);
 
-  const [draggingItem, setDraggingItem] = useState<{ chain: string; level: number; fromKey: string } | null>(null);
+  const [draggingItem, setDraggingItem] = useState<{ chain: string; level: number; fromKey: string; special?: string } | null>(null);
   const [mergeTargetKey, setMergeTargetKey] = useState<string | null>(null);
 
   const sensorOptions = useMemo(() => ({
@@ -35,7 +35,7 @@ const Board = () => {
     const { cellKey } = e.active.data.current as { cellKey: string };
     const [r, c] = parseKey(cellKey);
     const item = board[r]?.[c];
-    if (item) setDraggingItem({ chain: item.chain, level: item.level, fromKey: cellKey });
+    if (item) setDraggingItem({ chain: item.chain, level: item.level, fromKey: cellKey, special: item.special });
   }, [board]);
 
   const handleDragMove = useCallback((e: DragMoveEvent) => {
@@ -47,6 +47,7 @@ const Board = () => {
       targetItem &&
       targetItem.chain === draggingItem.chain &&
       targetItem.level === draggingItem.level &&
+      targetItem.special === draggingItem.special &&
       (r !== fromR || c !== fromC)
     ) {
       setMergeTargetKey(`${r}-${c}`);
@@ -68,7 +69,11 @@ const Board = () => {
     const fromItem = board[fromR]?.[fromC];
     const toItem = board[toR]?.[toC];
 
-    if (fromItem && toItem && fromItem.chain === toItem.chain && fromItem.level === toItem.level) {
+    const canMerge = fromItem && toItem &&
+      fromItem.chain === toItem.chain &&
+      fromItem.level === toItem.level &&
+      fromItem.special === toItem.special;
+    if (canMerge) {
       mergeItems(fromR, fromC, toR, toC);
     } else if (fromItem && toItem) {
       swapItems(fromR, fromC, toR, toC);
@@ -77,7 +82,9 @@ const Board = () => {
     }
   }, [board, mergeItems, swapItems, moveItem]);
 
-  const dragOverlayItem = draggingItem ? getChainItem(draggingItem.chain, draggingItem.level) : null;
+  const dragOverlayItem = draggingItem
+    ? (draggingItem.special === 'energyBox' ? { emoji: '⚡' } : getChainItem(draggingItem.chain, draggingItem.level))
+    : null;
 
   return (
     <DndContext

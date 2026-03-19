@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import useGameStore from '../store/gameStore';
 import { getChain } from '../data/chains';
+import { getGeneratorEnergyCost } from '../data/generators';
 import styles from './SourceBar.module.css';
 
 const SourceBar = () => {
@@ -9,6 +10,7 @@ const SourceBar = () => {
   const upgradeSource = useGameStore(s => s.upgradeSource);
   const getSourceUpgradeCost = useGameStore(s => s.getSourceUpgradeCost);
   const gold = useGameStore(s => s.gold);
+  const energyCurrent = useGameStore(s => s.energy.current);
   const [, tick] = useState(0);
 
   useEffect(() => {
@@ -24,21 +26,25 @@ const SourceBar = () => {
         const now = Date.now();
         const ready = now >= source.cooldownEnd;
         const remaining = ready ? 0 : Math.ceil((source.cooldownEnd - now) / 1000);
+        const eCost = getGeneratorEnergyCost(source.chainId);
+        const hasEnergy = energyCurrent >= eCost;
         const upgCost = getSourceUpgradeCost(source.chainId);
         const canUpgrade = upgCost > 0 && gold >= upgCost;
 
         return (
           <div key={source.chainId} className={styles.sourceWrap}>
             <button
-              className={`${styles.source} ${ready ? styles.ready : styles.cooling}`}
+              className={`${styles.source} ${ready && hasEnergy ? styles.ready : styles.cooling}`}
               onClick={() => tapSource(source.chainId)}
-              disabled={!ready}
+              disabled={!ready || !hasEnergy}
             >
               <span className={styles.emoji}>{chain.sourceEmoji}</span>
-              {ready ? (
-                <span className={styles.label}>{chain.sourceName}</span>
-              ) : (
+              {ready && hasEnergy ? (
+                <span className={styles.label}>⚡{eCost} {chain.sourceName}</span>
+              ) : !ready ? (
                 <span className={styles.timer}>{remaining}초</span>
+              ) : (
+                <span className={styles.timer}>⚡부족</span>
               )}
               {source.level > 1 && <span className={styles.lvBadge}>Lv{source.level}</span>}
             </button>

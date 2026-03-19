@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo } from 'react';
 import { DndContext, DragOverlay, PointerSensor, TouchSensor, useSensor, useSensors, type DragStartEvent, type DragMoveEvent, type DragEndEvent } from '@dnd-kit/core';
-import useGameStore from '../store/gameStore';
+import useGameStore, { type BoardItem } from '../store/gameStore';
 import { getChainItem } from '../data/chains';
 import Cell from './Cell';
 import styles from './Board.module.css';
@@ -10,7 +10,11 @@ const parseKey = (key: string): [number, number] => {
   return [r, c];
 };
 
-const Board = () => {
+interface BoardProps {
+  onItemClick?: (item: BoardItem) => void;
+}
+
+const Board = ({ onItemClick }: BoardProps) => {
   const board = useGameStore(s => s.board);
   const boardSize = useGameStore(s => s.boardSize);
   const mergeItems = useGameStore(s => s.mergeItems);
@@ -108,6 +112,7 @@ const Board = () => {
               c={c}
               item={board[r]?.[c] ?? null}
               isMergeTarget={mergeTargetKey === `${r}-${c}`}
+              onItemClick={onItemClick}
             />
           ))
         )}

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import TopBar from './components/TopBar';
 import SourceBar from './components/SourceBar';
 import OrderBoard from './components/OrderBoard';
@@ -7,13 +7,15 @@ import BottomBar from './components/BottomBar';
 import FloatingTexts from './components/FloatingTexts';
 import FtueOverlay from './components/FtueOverlay';
 import EnergyModal from './components/EnergyModal';
-import useGameStore from './store/gameStore';
+import ItemInfoModal from './components/ItemInfoModal';
+import useGameStore, { type BoardItem } from './store/gameStore';
 import './styles/global.css';
 
 function App() {
   const load = useGameStore(s => s.load);
   const save = useGameStore(s => s.save);
   const tickEnergy = useGameStore(s => s.tickEnergy);
+  const [selectedItem, setSelectedItem] = useState<BoardItem | null>(null);
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
@@ -33,12 +35,15 @@ function App() {
       <OrderBoard />
       <SourceBar />
       <main className="main">
-        <Board />
+        <Board onItemClick={setSelectedItem} />
       </main>
       <BottomBar />
       <FloatingTexts />
       <FtueOverlay />
       <EnergyModal />
+      {selectedItem && (
+        <ItemInfoModal item={selectedItem} onClose={() => setSelectedItem(null)} />
+      )}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mk-rebirth-v1';
+const CACHE_NAME = 'mk-rebirth-v2';
 const PRECACHE = ['/merge-kingdom/'];
 
 self.addEventListener('install', e => {

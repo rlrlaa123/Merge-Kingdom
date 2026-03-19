@@ -8,8 +8,8 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="MergeKingdom" />
     <meta name="description" content="드래그 & 머지로 키우는 모바일 게임" />
-    <!-- <link rel="manifest" href="manifest.json" /> -->
-    <!-- <link rel="apple-touch-icon" href="icon-192.png" /> -->
+    <link rel="manifest" href="manifest.json" />
+    <link rel="apple-touch-icon" href="icon-192.svg" />
     <title>Merge Kingdom 👑</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>👑</text></svg>" />
   </head>
@@ -17,12 +17,8 @@
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
     <script>
-      // 이전 SW 해제
       if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(regs => {
-          regs.forEach(r => r.unregister());
-        });
-        caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
+        navigator.serviceWorker.register('/merge-kingdom/sw.js');
       }
     </script>
   </body>

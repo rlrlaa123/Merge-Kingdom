@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react';
 import useGameStore from '../store/gameStore';
 import { getChain } from '../data/chains';
 import { getGeneratorEnergyCost } from '../data/generators';
@@ -11,21 +10,12 @@ const SourceBar = () => {
   const getSourceUpgradeCost = useGameStore(s => s.getSourceUpgradeCost);
   const gold = useGameStore(s => s.gold);
   const energyCurrent = useGameStore(s => s.energy.current);
-  const [, tick] = useState(0);
-
-  useEffect(() => {
-    const id = setInterval(() => tick(t => t + 1), 500);
-    return () => clearInterval(id);
-  }, []);
 
   return (
     <div className={styles.bar}>
       {sources.map(source => {
         const chain = getChain(source.chainId);
         if (!chain) return null;
-        const now = Date.now();
-        const ready = now >= source.cooldownEnd;
-        const remaining = ready ? 0 : Math.ceil((source.cooldownEnd - now) / 1000);
         const eCost = getGeneratorEnergyCost(source.chainId);
         const hasEnergy = energyCurrent >= eCost;
         const upgCost = getSourceUpgradeCost(source.chainId);
@@ -34,15 +24,13 @@ const SourceBar = () => {
         return (
           <div key={source.chainId} className={styles.sourceWrap}>
             <button
-              className={`${styles.source} ${ready && hasEnergy ? styles.ready : styles.cooling}`}
+              className={`${styles.source} ${hasEnergy ? styles.ready : styles.cooling}`}
               onClick={() => tapSource(source.chainId)}
-              disabled={!ready || !hasEnergy}
+              disabled={!hasEnergy}
             >
               <span className={styles.emoji}>{chain.sourceEmoji}</span>
-              {ready && hasEnergy ? (
+              {hasEnergy ? (
                 <span className={styles.label}>⚡{eCost} {chain.sourceName}</span>
-              ) : !ready ? (
-                <span className={styles.timer}>{remaining}초</span>
               ) : (
                 <span className={styles.timer}>⚡부족</span>
               )}

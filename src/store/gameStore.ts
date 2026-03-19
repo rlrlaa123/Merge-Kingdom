@@ -154,7 +154,7 @@ const useGameStore = create<GameStore>((set, get) => ({
   tapSource: (chainId) => {
     const { board, boardSize, sources, energy } = get();
     const source = sources.find(s => s.chainId === chainId);
-    if (!source || Date.now() < source.cooldownEnd) return false;
+    if (!source) return false;
 
     const eCost = getGeneratorEnergyCost(chainId);
     if (energy.current < eCost) return false;
@@ -180,14 +180,8 @@ const useGameStore = create<GameStore>((set, get) => ({
       if (c3) newBoard[c3.r][c3.c] = { id: uid(), chain: 'energyBox', level: 1, special: 'energyBox' };
     }
 
-    const cooldown = getGeneratorCooldown(chainId, source.level);
-    const newSources = sources.map(s =>
-      s.chainId === chainId ? { ...s, cooldownEnd: Date.now() + cooldown } : s
-    );
-
     set({
       board: newBoard,
-      sources: newSources,
       energy: { ...energy, current: energy.current - eCost },
     });
 

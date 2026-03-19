@@ -94,8 +94,8 @@ const getNearbyEmptyCell = (
 // 소스 업그레이드 스펙
 const SOURCE_SPECS = [
   { lv2Chance: 0, doubleProdChance: 0, upgradeCost: 0 },
-  { lv2Chance: 0.20, doubleProdChance: 0, upgradeCost: 100 },
-  { lv2Chance: 0.35, doubleProdChance: 0.05, upgradeCost: 500 },
+  { lv2Chance: 0.08, doubleProdChance: 0, upgradeCost: 100 },
+  { lv2Chance: 0.15, doubleProdChance: 0.03, upgradeCost: 500 },
 ];
 const getSourceSpec = (lv: number) => SOURCE_SPECS[Math.min(lv - 1, 2)];
 

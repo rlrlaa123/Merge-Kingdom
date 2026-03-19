@@ -1,4 +1,6 @@
-import useGameStore from '../store/gameStore';
+import { useState } from 'react';
+import useGameStore, { type BoardItem } from '../store/gameStore';
+import ItemInfoModal from './ItemInfoModal';
 import styles from './OrderBoard.module.css';
 
 const DIFF_CLASS: Record<string, string> = {
@@ -13,6 +15,7 @@ const OrderBoard = () => {
   const deliverOrder = useGameStore(s => s.deliverOrder);
   const board = useGameStore(s => s.board);
   const boardSize = useGameStore(s => s.boardSize);
+  const [selectedItem, setSelectedItem] = useState<BoardItem | null>(null);
 
   // 보드 아이템 카운팅
   const available: Record<string, number> = {};
@@ -60,7 +63,14 @@ const OrderBoard = () => {
                       const have = available[key] || 0;
                       const met = have >= item.quantity;
                       return (
-                        <span key={i} className={`${styles.req} ${met ? styles.met : ''}`}>
+                        <span
+                          key={i}
+                          className={`${styles.req} ${met ? styles.met : ''}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedItem({ id: '', chain: item.chain, level: item.level });
+                          }}
+                        >
                           {item.emoji}×{item.quantity}
                         </span>
                       );
@@ -82,6 +92,9 @@ const OrderBoard = () => {
           );
         })}
       </div>
+      {selectedItem && (
+        <ItemInfoModal item={selectedItem} onClose={() => setSelectedItem(null)} />
+      )}
     </div>
   );
 };

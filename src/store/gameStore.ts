@@ -49,13 +49,14 @@ const today = () => new Date().toISOString().slice(0, 10);
 const createEmptyBoard = (size: number): (BoardItem | null)[][] =>
   Array(size).fill(null).map(() => Array(size).fill(null));
 const cloneBoard = (b: (BoardItem | null)[][]) => b.map(r => [...r]);
-const findEmptyCells = (b: (BoardItem | null)[][], s: number) => {
+const findEmptyCells = (b: (BoardItem | null)[][], s: number, maxRow?: number) => {
   const cells: { r: number; c: number }[] = [];
-  for (let r = 0; r < s; r++) for (let c = 0; c < s; c++) if (!b[r][c]) cells.push({ r, c });
+  const rowLimit = maxRow !== undefined ? Math.min(maxRow, s) : s;
+  for (let r = 0; r < rowLimit; r++) for (let c = 0; c < s; c++) if (!b[r][c]) cells.push({ r, c });
   return cells;
 };
-const getRandomEmptyCell = (b: (BoardItem | null)[][], s: number) => {
-  const cells = findEmptyCells(b, s);
+const getRandomEmptyCell = (b: (BoardItem | null)[][], s: number, maxRow?: number) => {
+  const cells = findEmptyCells(b, s, maxRow);
   return cells.length ? cells[Math.floor(Math.random() * cells.length)] : null;
 };
 
@@ -152,14 +153,15 @@ const useGameStore = create<GameStore>((set, get) => ({
 
   // === 소스 탭 (에너지 소모) ===
   tapSource: (chainId) => {
-    const { board, boardSize, sources, energy } = get();
+    const { board, boardSize, sources, energy, ftueStep } = get();
     const source = sources.find(s => s.chainId === chainId);
     if (!source) return false;
 
     const eCost = getGeneratorEnergyCost(chainId);
     if (energy.current < eCost) return false;
 
-    const cell = getRandomEmptyCell(board, boardSize);
+    const isTutorial = ftueStep > 0 && ftueStep <= 4;
+    const cell = getRandomEmptyCell(board, boardSize, isTutorial ? 2 : undefined);
     if (!cell) return false;
 
     const spec = getSourceSpec(source.level);
